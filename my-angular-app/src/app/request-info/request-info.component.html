@@ -1,0 +1,160 @@
+<div class="p-4">
+  <!-- Conteneur principal avec le cadre gris -->
+  <div class="bg-gray-100 rounded-xl shadow-lg p-4">
+    <!-- Application de base -->
+    <div class="application-base">
+      <!-- Grille principale pour Request Information et Response Information -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <!-- Request Information (à gauche) -->
+        <div>
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold text-center text-gray-900">Request Information</h3>
+            <!-- Bouton Configuration avec icône -->
+            <button (click)="openConfigurationModal()" class="px-4 py-2 bg-blue-500 text-white rounded-md flex items-center">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+              </svg>
+              Configuration
+            </button>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Colonne gauche -->
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Request Type</label>
+                <select [(ngModel)]="requestData.requestType" (ngModelChange)="onRequestTypeChange()" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option *ngFor="let type of requestTypes" [value]="type">{{type}}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Ref Number</label>
+                <input type="text" [(ngModel)]="requestData.refNumber" [disabled]="requestInfoDisabledFields['refNumber']" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">App Sender</label>
+                <input type="text" [(ngModel)]="requestData.appSender" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+
+            <!-- Colonne droite -->
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">POPID</label>
+                <input type="text" [(ngModel)]="requestData.popId" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">WorkID</label>
+                <input type="text" [(ngModel)]="requestData.workId" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">STAN</label>
+                <input type="text" [(ngModel)]="requestData.stan" [disabled]="requestData.requestType !== 'LoyaltyAwardRefund'" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">RequestID</label>
+                <div class="flex items-center space-x-2">
+                  <input type="text" [(ngModel)]="requestData.requestId" class="flex-1 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <div class="flex items-center">
+                    <input type="checkbox" [(ngModel)]="requestData.autoIncrement" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label class="ml-2 text-sm text-gray-700">Auto</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+         <!-- Boutons Send, Clear et Bonus -->
+<div class="mt-4 flex justify-center gap-4">
+  <button class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition" (click)="sendRequest()">
+    Send
+  </button>
+  <button class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition" (click)="clearFields()">
+    Clear
+  </button>
+  <button class="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition" 
+          [disabled]="!isBonusButtonEnabled()" 
+          (click)="onBonusClick()">
+    Bonus
+  </button>
+</div>
+
+          <!-- Boutons des sous-sections -->
+          <div class="flex justify-center gap-4 mt-4">
+            <button class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition" (click)="showSubSection('pos-data')">
+              POS Data
+            </button>
+            <button class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition" (click)="showSubSection('amount')">
+              Amount
+            </button>
+            <button class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition" (click)="showSubSection('loyalty')">
+              Loyalty
+            </button>
+          </div>
+        </div>
+
+        <!-- Response Information (à droite) -->
+        <div>
+          <app-response-info></app-response-info>
+        </div>
+      </div>
+
+      <!-- Sous-sections -->
+      <div class="mb-4">
+        <router-outlet></router-outlet>
+      </div>
+    </div>
+
+    <!-- Séparateur (div vide pour l'espace) -->
+    <div class="h-4"></div>
+
+    <!-- Nouvelles sections (Devices et Data Request) -->
+    <div class="new-sections">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Devices -->
+      
+<div>
+  <h3 class="text-lg font-bold text-gray-900 mb-4">Devices</h3>
+  <div class="space-y-4">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Display</label>
+      <textarea [(ngModel)]="deviceData.display" rows="3" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" readonly></textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Printer</label>
+      <textarea [(ngModel)]="deviceData.printer" rows="10" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" readonly></textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Cashier Terminal</label>
+      <textarea [(ngModel)]="deviceData.cashierTerminal" rows="3" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" readonly></textarea>
+    </div>
+  </div>
+</div>
+
+        <!-- Data Request -->
+        <div>
+          <h3 class="text-lg font-bold text-gray-900 mb-4">Data Request</h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Menu/Action</label>
+              <select [(ngModel)]="dataRequest.menuAction" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option *ngFor="let option of menuActionOptions" [value]="option">{{ option }}</option>
+              </select>
+            </div>
+            <div class="flex justify-between gap-2">
+              <button class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition" (click)="resetDataRequest()">
+                Reset
+              </button>
+              <button class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition" (click)="sendDataRequest()">
+                Send
+              </button>
+              <button class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition" (click)="quitDataRequest()">
+                Quit
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

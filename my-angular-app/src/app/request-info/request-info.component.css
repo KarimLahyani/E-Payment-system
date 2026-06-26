@@ -1,0 +1,18 @@
+/* Ajustements pour une présentation propre */
+.request-info-container {
+    max-width: 1200px; /* Limite la largeur totale */
+    margin: 0 auto; /* Centre la div */
+  }
+  
+  .request-info-container .flex {
+    flex-wrap: nowrap; /* Empêche le passage à la ligne sur petits écrans */
+  }
+  
+  .request-info-container input,
+  .request-info-container select {
+    font-size: 0.9rem; /* Réduit légèrement la taille des champs */
+  }
+  
+  .request-info-container label {
+    font-size: 0.9rem; /* Réduit la taille des étiquettes */
+  }

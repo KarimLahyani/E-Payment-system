@@ -1,0 +1,28 @@
+# Node modules
+node_modules/
+
+# Angular cache and output
+.angular/
+dist/
+/tmp
+/out-tsc
+/bazel-out
+
+# IDEs and editors
+.idea/
+.vscode/
+.history/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Log files
+npm-debug.log
+yarn-error.log
+*.log
+
+# System files
+.DS_Store
+Thumbs.db

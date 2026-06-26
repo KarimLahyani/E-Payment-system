@@ -1,0 +1,91 @@
+<h3 class="text-xl font-bold text-center text-gray-900 mb-4">Response Information</h3>
+
+<div *ngIf="responseData; else noData" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+  <div class="space-y-6">
+    <!-- Request Type -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">Request Type</label>
+      <input
+        type="text"
+        [value]="responseData.cardServiceResponse.attributes.requestType || ''"
+        readonly
+        class="w-full p-2 border border-gray-300 rounded-md bg-gray-50"
+      />
+    </div>
+
+    <!-- Terminal ID -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">Terminal ID</label>
+      <input
+        type="text"
+        [value]="responseData.cardServiceResponse.terminal.terminalId || ''"
+        readonly
+        class="w-full p-2 border border-gray-300 rounded-md bg-gray-50"
+      />
+    </div>
+
+    <!-- Amount -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+      <input
+        type="text"
+        [value]="responseData.cardServiceResponse.tender.totalAmount.value || ''"
+        readonly
+        class="w-full p-2 border border-gray-300 rounded-md bg-gray-50"
+      />
+    </div>
+  </div>
+
+  <div class="space-y-6">
+    <!-- Overall Result -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">Overall Result</label>
+      <input
+        type="text"
+        [value]="responseData.cardServiceResponse.attributes.overallResult || ''"
+        readonly
+        class="w-full p-2 border border-gray-300 rounded-md bg-gray-50"
+      />
+    </div>
+
+    <!-- STAN -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">STAN</label>
+      <input
+        type="text"
+        [value]="responseData.cardServiceResponse.terminal.stan || ''"
+        readonly
+        class="w-full p-2 border border-gray-300 rounded-md bg-gray-50"
+      />
+    </div>
+
+    <!-- Terminal Batch -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">Terminal Batch</label>
+      <input
+        type="text"
+        [value]="responseData.cardServiceResponse.terminal.terminalBatch || ''"
+        readonly
+        class="w-full p-2 border border-gray-300 rounded-md bg-gray-50"
+      />
+    </div>
+
+    <!-- Request ID -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">Request ID</label>
+      <input
+        type="text"
+        [value]="responseData.cardServiceResponse.attributes.requestId || ''"
+        readonly
+        class="w-full p-2 border border-gray-300 rounded-md bg-gray-50"
+      />
+    </div>
+  </div>
+</div>
+
+<!-- Message si aucune donnée n'est disponible -->
+<ng-template #noData>
+  <div class="text-center text-gray-600 mt-6">
+    No response information available.
+  </div>
+</ng-template>

@@ -1,0 +1,83 @@
+
+  <h3 class="text-2xl font-bold text-center text-gray-900 mb-8">Loyalty</h3>
+
+  <!-- Checkbox Loyalty Flag -->
+  <div class="mb-6 flex items-center">
+    <input type="checkbox" [(ngModel)]="loyaltyData.loyaltyFlag" [disabled]="loyaltyDisabledFields['loyaltyFlag']" (ngModelChange)="onFieldChange()" class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+    <label class="ml-3 text-lg font-medium text-gray-700">Loyalty Flag</label>
+  </div>
+
+  <!-- Grille des champs -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <!-- Colonne de gauche -->
+    <div class="space-y-6">
+      <!-- Card Entry Mode -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Card Entry Mode</label>
+        <select [(ngModel)]="loyaltyData.cardEntryMode" [disabled]="loyaltyDisabledFields['cardEntryMode']" (ngModelChange)="onFieldChange()" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option *ngFor="let mode of entryModes" [value]="mode">{{ mode }}</option>
+        </select>
+      </div>
+      <!-- Loyalty Card -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Loyalty Card</label>
+        <input type="text" [(ngModel)]="loyaltyData.loyaltyCard" [disabled]="loyaltyDisabledFields['loyaltyCard']" (ngModelChange)="onFieldChange()" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <!-- Loyalty PAN -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Loyalty PAN</label>
+        <input type="text" [(ngModel)]="loyaltyData.loyaltyPan" [disabled]="loyaltyDisabledFields['loyaltyPan']" (ngModelChange)="onFieldChange()" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <!-- Card Entry Mode New -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Card Entry Mode New</label>
+        <select [(ngModel)]="loyaltyData.cardEntryModeNew" [disabled]="loyaltyDisabledFields['cardEntryModeNew']" (ngModelChange)="onFieldChange()" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option *ngFor="let mode of entryModes" [value]="mode">{{ mode }}</option>
+        </select>
+      </div>
+      <!-- Loyalty Card New -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Loyalty Card New</label>
+        <input type="text" [(ngModel)]="loyaltyData.loyaltyCardNew" [disabled]="loyaltyDisabledFields['loyaltyCardNew']" (ngModelChange)="onFieldChange()" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <!-- Loyalty PAN New -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Loyalty PAN New</label>
+        <input type="text" [(ngModel)]="loyaltyData.loyaltyPanNew" [disabled]="loyaltyDisabledFields['loyaltyPanNew']" (ngModelChange)="onFieldChange()" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+    </div>
+
+    <!-- Colonne de droite -->
+    <div class="space-y-6">
+      <!-- Loyalty Timestamp -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Loyalty Timestamp</label>
+        <input type="text" [(ngModel)]="loyaltyData.loyaltyTimestamp" [disabled]="loyaltyDisabledFields['loyaltyTimestamp']" (ngModelChange)="onFieldChange()" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <!-- Loyalty Amount -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Loyalty Amount</label>
+        <input type="text" [(ngModel)]="loyaltyData.loyaltyAmount" [disabled]="loyaltyDisabledFields['loyaltyAmount']" (ngModelChange)="onFieldChange()" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <!-- Loyalty Original Amount -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Loyalty Original Amount</label>
+        <input type="text" [(ngModel)]="loyaltyData.loyaltyOriginalAmount" [disabled]="loyaltyDisabledFields['loyaltyOriginalAmount']" (ngModelChange)="onFieldChange()" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <!-- Loyalty Approval Code -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Loyalty Approval Code</label>
+        <input type="text" [(ngModel)]="loyaltyData.loyaltyApprovalCode" [disabled]="loyaltyDisabledFields['loyaltyApprovalCode']" (ngModelChange)="onFieldChange()" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <!-- Loyalty Acquirer ID -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Loyalty Acquirer ID</label>
+        <input type="text" [(ngModel)]="loyaltyData.loyaltyAcquirerId" [disabled]="loyaltyDisabledFields['loyaltyAcquirerId']" (ngModelChange)="onFieldChange()" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <!-- Loyalty Acquirer Batch -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Loyalty Acquirer Batch</label>
+        <input type="text" [(ngModel)]="loyaltyData.loyaltyAcquirerBatch" [disabled]="loyaltyDisabledFields['loyaltyAcquirerBatch']" (ngModelChange)="onFieldChange()" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+    </div>
+  </div>

@@ -1,0 +1,3 @@
+ng generate service services/configuration
+ng add @angular/material
+ng generate component configuration-modal

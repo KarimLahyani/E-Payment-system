@@ -1,0 +1,40 @@
+<div class="p-6">
+    <h2 mat-dialog-title class="text-xl font-semibold mb-4">Configuration TCP/IP</h2>
+    <mat-dialog-content>
+      <div class="grid grid-cols-1 gap-4">
+        <!-- Adresse IP Client -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Adresse IP Client :</label>
+          <input type="text" [(ngModel)]="configData.clientIp" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- Adresse IP Serveur -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Adresse IP Serveur :</label>
+          <input type="text" [(ngModel)]="configData.serverIp" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" readonly>
+        </div>
+
+        <!-- Port EPS -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Port (EPS) :</label>
+          <input type="number" [(ngModel)]="configData.epsPort" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- Port POS Proxy -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Port (POS Proxy) :</label>
+          <input type="number" [(ngModel)]="configData.posProxyPort" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- OPI Mode -->
+        <div class="flex items-center">
+          <input type="checkbox" [(ngModel)]="configData.opiMode" class="mr-2">
+          <label class="text-sm font-medium text-gray-700">OPI Mode</label>
+        </div>
+      </div>
+    </mat-dialog-content>
+    <mat-dialog-actions class="flex justify-end mt-4">
+      <button mat-button class="px-4 py-2 bg-gray-300 rounded-md mr-2" (click)="onCancel()">Cancel</button>
+      <button mat-button class="px-4 py-2 bg-blue-500 text-white rounded-md" (click)="onSave()">OK</button>
+    </mat-dialog-actions>
+  </div>

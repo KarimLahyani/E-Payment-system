@@ -1,0 +1,11 @@
+{
+    "response-info": {
+      "requestType": "CardPayment",
+      "terminalId": "123456",
+      "amount": "100.00",
+      "overallResult": "Success",
+      "stan": "ABC123",
+      "requestId": "REQ001"
+    }
+  }
+  
