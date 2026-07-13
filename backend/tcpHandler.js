@@ -274,7 +274,7 @@ const processCardServiceResponse = async (responseXML) => {
     requestId = cardServiceResponse['$']?.RequestID || '0';
     const stan = cardServiceResponse.Terminal?.['$']?.STAN || cardServiceResponse.Terminal?.STAN || null;
     const terminalId = cardServiceResponse.Terminal?.['$']?.TerminalID || cardServiceResponse.Terminal?.TerminalID || null;
-    const terminalBatch = cardServiceResponse.Terminal?.['$']?.TerminalBatch || cardServiceResponse.Terminal?.TerminalBatch || null;
+    const terminalBatch = cardServiceResponse.Terminal?.['$']?.TerminalBatch || cardServiceResponse.Terminal?.TerminalBatch || '000001';
 
     // Extraire le totalAmount
     let totalAmount = cardServiceResponse.Tender?.TotalAmount?._ || '0';
