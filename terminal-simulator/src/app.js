@@ -1,64 +1,5 @@
 (function () {
-  const STORAGE_KEY = "ifsf-terminal-simulator-cards";
-
-  const defaultCards = [
-    {
-      id: "acme-fleet-diesel",
-      name: "ACME Fleet Diesel",
-      business: "ACME Logistics",
-      token: "tok_acme_700001_9012",
-      bin: "700001",
-      last4: "9012",
-      expiry: "2030-12",
-      expectedCode: "4321",
-      allowedProducts: ["102"],
-      limit: 350,
-      status: "ACTIVE",
-      offlineAllowed: true
-    },
-    {
-      id: "northwind-retail",
-      name: "Northwind Staff Retail",
-      business: "Northwind Stores",
-      token: "tok_north_700002_1044",
-      bin: "700002",
-      last4: "1044",
-      expiry: "2029-05",
-      expectedCode: "2468",
-      allowedProducts: ["201", "301", "101"],
-      limit: 180,
-      status: "ACTIVE",
-      offlineAllowed: false
-    },
-    {
-      id: "blocked-contractor",
-      name: "Blocked Contractor",
-      business: "Roadworks Partner",
-      token: "tok_blocked_700003_5520",
-      bin: "700003",
-      last4: "5520",
-      expiry: "2028-09",
-      expectedCode: "1111",
-      allowedProducts: ["102", "101"],
-      limit: 100,
-      status: "BLOCKED",
-      offlineAllowed: false
-    },
-    {
-      id: "expired-card",
-      name: "Expired Service Card",
-      business: "Legacy Fleet",
-      token: "tok_expired_700004_7780",
-      bin: "700004",
-      last4: "7780",
-      expiry: "2025-01",
-      expectedCode: "9999",
-      allowedProducts: ["102"],
-      limit: 500,
-      status: "ACTIVE",
-      offlineAllowed: true
-    }
-  ];
+  
 
   const state = {
     cards: loadCards(),
@@ -102,13 +43,7 @@
     resetBtn: document.querySelector("#resetBtn")
   };
 
-  const products = [
-    { product_code: "101", name: "Premium Unleaded", unit_price: 1.95, unit_measure: "L", tax_code: "A" },
-    { product_code: "102", name: "Diesel", unit_price: 1.85, unit_measure: "L", tax_code: "A" },
-    { product_code: "201", name: "Coffee", unit_price: 2.50, unit_measure: "EA", tax_code: "B" },
-    { product_code: "301", name: "Car Wash (Basic)", unit_price: 10.00, unit_measure: "EA", tax_code: "C" },
-    { product_code: "202", name: "Sandwich", unit_price: 5.50, unit_measure: "EA", tax_code: "B" }
-  ];
+
 
   let currentRequestXml = '';
 
@@ -189,7 +124,7 @@
       state.terminalMode = 'waitingForCard';
       state.insertedCardId = null;
       state.codeBuffer = '';
-      setResult("Transaction started. Insert the selected business card on the terminal.", "");
+      setResult("Transaction started. Insert the selected card on the terminal.", "");
       setConnection("Waiting for card");
       setScreen(["INSERT CARD", `Sale ${formatMoney(amount, 'EUR')}`]);
       state.dbPreview = buildDatabasePreview(null, null);
@@ -198,17 +133,20 @@
   });
 
   function loadCards() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-      return Array.isArray(saved) && saved.length ? saved : defaultCards.slice();
-    } catch (_) {
-      return defaultCards.slice();
-    }
+    fetch('http://localhost:3000/api/cards')
+      .then(res => res.json())
+      .then(data => {
+        state.cards = data;
+        if (!state.selectedCardId && state.cards.length > 0) {
+          state.selectedCardId = state.cards[0].id;
+        }
+        render();
+      })
+      .catch(err => console.error("Error loading cards:", err));
+    return [];
   }
 
-  function saveCards() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.cards));
-  }
+  function saveCards() { /* replaced by API calls */ }
 
   function selectedCard() {
     return state.cards.find((card) => card.id === state.selectedCardId) || state.cards[0];
@@ -226,14 +164,12 @@
       button.className = `business-card${card.id === state.selectedCardId ? " selected" : ""}`;
       button.innerHTML = `
         <strong>${escapeHtml(card.name)}</strong>
-        <span>${escapeHtml(card.business)}</span>
-        <span>**** ${escapeHtml(card.last4)} - BIN ${escapeHtml(card.bin)}</span>
-        <span>Expires ${escapeHtml(card.expiry)} - Credit ${formatMoney(card.limit, el.currencyInput.value)}</span>
+        <span>**** ${escapeHtml(card.number.slice(-4))} - ID ${escapeHtml(card.id)}</span>
+        <span>Expires ${escapeHtml(card.expiry)} - Credit ${formatMoney(card.balance, el.currencyInput.value)}</span>
         <span class="card-meta">
           <span>${escapeHtml(card.status)}</span>
-          <span>Password: <strong>${escapeHtml(card.expectedCode)}</strong></span>
+          <span>Password: <strong>${escapeHtml(card.passcode)}</strong></span>
         </span>
-        <span class="card-tags">${card.allowedProducts.map((product) => `<span>${escapeHtml(productLabel(product))}</span>`).join("")}</span>
       `;
       button.addEventListener("click", () => {
         state.selectedCardId = card.id;
@@ -321,11 +257,11 @@
       amount,
       currency: el.currencyInput.value,
       productCode: el.productInput.value,
-      productName: productByCode(el.productInput.value).name,
-      unitPrice: productByCode(el.productInput.value).unit_price,
-      unitMeasure: productByCode(el.productInput.value).unit_measure,
-      taxCode: productByCode(el.productInput.value).tax_code,
-      quantity: calculateQuantity(amount, productByCode(el.productInput.value).unit_price),
+      productName: el.productInput.options[el.productInput.selectedIndex].text.split(" - ")[0],
+      unitPrice: 1.00,
+      unitMeasure: "L",
+      taxCode: "A",
+      quantity: amount,
       siteId: el.siteInput.value.trim() || "UNKNOWN-SITE",
       pumpId: el.pumpInput.value.trim() || "UNSPECIFIED",
       driverId: el.driverInput.value.trim() || "UNKNOWN-DRIVER",
@@ -340,7 +276,7 @@
     state.terminalMode = "waitingForCard";
     state.insertedCardId = null;
     state.codeBuffer = "";
-    setResult("Transaction started. Insert the selected business card on the terminal.", "");
+    setResult("Transaction started. Insert the selected card on the terminal.", "");
     setConnection("Waiting for card");
     setScreen(["INSERT CARD", `${transaction.type} ${formatMoney(amount, transaction.currency)}`]);
     state.dbPreview = buildDatabasePreview(null, null);
@@ -370,19 +306,19 @@
     state.terminalMode = "waitingForCode";
     state.codeBuffer = "";
     setConnection("Card inserted");
-    setScreen(["ENTER CODE", `${card.business} **** ${card.last4}`]);
+    setScreen(["ENTER CODE", `${card.name} **** ${card.number.slice(-4)}`]);
     state.dbPreview = buildDatabasePreview(card, null);
     send("TERM->APP", 0, "CardRequest", {
       requestType: "CardData",
-      token: card.token,
-      maskedPan: `${card.bin}******${card.last4}`,
+      token: `T${card.number}`,
+      maskedPan: `${card.number.slice(0, 6)}******${card.number.slice(-4)}`,
       expiry: card.expiry,
-      business: card.business,
+      business: card.name,
       scheme: "BusinessCard"
     });
     send("APP->TERM", 0, "CardResponse", {
       result: "CardAcceptedForProcessing",
-      cardToken: card.token
+      cardToken: `T${card.number}`
     });
     send("TERM->APP", 1, "DeviceRequest", {
       device: "CashierDisplay",
@@ -448,11 +384,11 @@
       const decision = decide(card, state.transaction, state.codeBuffer);
       const finalMode = decision.approved ? "approved" : "declined";
       if (decision.approved && state.transaction.type === 'Sale') {
-        card.limit -= state.transaction.amount;
-        saveCards();
+        card.balance -= state.transaction.amount;
+        fetch(`http://localhost:3000/api/cards/${card.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ balance: card.balance }) }).catch(console.error);
       } else if (decision.approved && state.transaction.type === 'Refund') {
-        card.limit += state.transaction.amount;
-        saveCards();
+        card.balance += state.transaction.amount;
+        fetch(`http://localhost:3000/api/cards/${card.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ balance: card.balance }) }).catch(console.error);
       }
 
       state.terminalMode = finalMode;
@@ -485,7 +421,7 @@
     <TotalAmount>${state.transaction.amount}</TotalAmount>
   </Tender>
   <Card>
-    <PAN>${card.bin}******${card.last4}</PAN>
+    <PAN>${card.number.slice(0, 6)}******${card.number.slice(-4)}</PAN>
     <ExpiryDate>${card.expiry.replace('-', '')}</ExpiryDate>
   </Card>
 </CardServiceResponse>`;
@@ -502,16 +438,16 @@
 
   function decide(card, transaction, code) {
     if (card.status !== "ACTIVE") {
-      return decline("Card status is blocked or inactive.", "CardBlocked", "105");
+      return decline("Card is blocked or invalid.", "InvalidCard", "104");
     }
     if (isExpired(card.expiry)) {
-      return decline("Card is expired.", "ExpiredCard", "101");
+      return decline("Card has expired.", "ExpiredCard", "101");
     }
-    if (card.expectedCode !== code) {
+    if (card.passcode !== code) {
       return decline("Driver code / PIN was not accepted.", "InvalidCode", "117");
     }
-    if (transaction.amount > card.limit) {
-      return decline(`Amount exceeds this business card credit of ${formatMoney(card.limit, transaction.currency)}.`, "LimitExceeded", "121");
+    if (transaction.amount > card.balance) {
+      return decline(`Amount exceeds this card credit of ${formatMoney(card.balance, transaction.currency)}.`, "LimitExceeded", "121");
     }
 
     const authCode = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -520,7 +456,7 @@
       responseCode: "000",
       reason: "Approved",
       authCode,
-      message: `Approved ${formatMoney(transaction.amount, transaction.currency)} for ${card.business}. Auth code ${authCode}.`
+      message: `Approved ${formatMoney(transaction.amount, transaction.currency)} for ${card.name}. Auth code ${authCode}.`
     };
   }
 
@@ -536,13 +472,12 @@
 
   function publicCardPayload(card) {
     return {
-      token: card.token,
-      maskedPan: `${card.bin}******${card.last4}`,
+      token: `T${card.number}`,
+      maskedPan: `${card.number.slice(0, 6)}******${card.number.slice(-4)}`,
       expiry: card.expiry,
-      business: card.business,
+      business: card.name,
       cardProfile: card.name,
-      status: card.status,
-      allowedProducts: card.allowedProducts.map((code) => ({ code, name: productLabel(code) }))
+      status: card.status
     };
   }
 
@@ -602,7 +537,7 @@ ${indent}</${name}>`;
   function buildDatabasePreview(card, decision) {
     if (!state.transaction) return "Start a transaction to see SQL mapped to your app schema.";
     const t = state.transaction;
-    const maskedPan = card ? card.bin + "******" + card.last4 : null;
+    const maskedPan = card ? card.number.slice(0, 6) + "******" + card.number.slice(-4) : null;
     const cardEntryMode = card ? "ICC_SIM" : "WAITING_CARD";
     const requestLines = [
       "-- Request-side writes for your app schema",
@@ -632,7 +567,7 @@ ${indent}</${name}>`;
     const loyaltyLines = card ? [
       ", loyalty_row AS (",
       "  INSERT INTO loyalty (loyalty_flag, card_entry_mode, loyalty_card, loyalty_pan, loyalty_amount, loyalty_original_amount, loyalty_approval_code, loyalty_acquirer_id, loyalty_acquirer_batch, bonus_card, request_info_id)",
-      "  SELECT " + ["false", sqlValue(cardEntryMode), sqlValue(card.token), sqlValue(maskedPan), sqlValue(toMoneyString(t.amount)), sqlValue(toMoneyString(t.amount)), sqlValue(decision ? decision.authCode : null), "'SIM-ACQ'", sqlValue(t.terminalBatch), "false", "req.id"].join(", "),
+      "  SELECT " + ["false", sqlValue(cardEntryMode), sqlValue(`T${card.number.slice(0, 15)}`), sqlValue(maskedPan), sqlValue(toMoneyString(t.amount)), sqlValue(toMoneyString(t.amount)), sqlValue(decision ? decision.authCode : null), "'SIM-ACQ'", sqlValue(t.terminalBatch), "false", "req.id"].join(", "),
       "  FROM req",
       "  RETURNING id",
       ")"
@@ -709,8 +644,8 @@ ${indent}</${name}>`;
     lines.push("TAX" + " ".repeat(40 - 3 - 4) + "0.00");
     lines.push("TOTAL" + " ".repeat(40 - 5 - amountStr.length) + amountStr);
     lines.push(divider);
-    lines.push("CARD:" + " ".repeat(40 - 5 - 9) + `**** ${card.last4}`);
-    lines.push("TYPE:" + " ".repeat(40 - 5 - card.business.length) + card.business.toUpperCase());
+    lines.push("CARD:" + " ".repeat(40 - 5 - 9) + `**** ${card.number.slice(-4)}`);
+    lines.push("NAME:" + " ".repeat(40 - 5 - card.name.length) + card.name.toUpperCase());
     const authCode = decision.authCode || 'N/A';
     lines.push("AUTH:" + " ".repeat(40 - 5 - authCode.length) + authCode);
     const reason = decision.reason.toUpperCase();
@@ -738,48 +673,47 @@ ${indent}</${name}>`;
     state.dbPreview = "";
     setConnection("Terminal idle");
     setScreen(["WELCOME", "Ready for transaction"]);
-    setResult("Configure a sale, pick a business card, then start the terminal flow.", "");
+    setResult("Configure a sale, pick a card, then start the terminal flow.", "");
     render();
   }
 
-  function resetDefaults() {
-    state.cards = defaultCards.slice();
-    state.selectedCardId = state.cards[0].id;
-    saveCards();
-    render();
-  }
+  function loadDefaults() { fetch('http://localhost:3000/api/cards/reset', { method: 'POST' }).then(() => { state.selectedCardId = '1'; loadCards(); }).catch(console.error); }
 
   function addCard(event) {
     event.preventDefault();
-    const products = Array.from(document.querySelector("#newCardProducts").selectedOptions).map((option) => option.value);
-    const bin = document.querySelector("#newCardBin").value.trim();
-    const last4 = document.querySelector("#newCardLast4").value.trim();
     const code = document.querySelector("#newCardCode").value.trim();
-    if (!/^\d{4,8}$/.test(bin) || !/^\d{4}$/.test(last4) || !/^\d{1,8}$/.test(code)) {
-      setResult("Use numeric BIN, last 4, and code values for card profiles.", "declined");
+    if (!/^\d{1,8}$/.test(code)) {
+      setResult("Use numeric code for card passcode.", "declined");
       return;
     }
 
-    const business = document.querySelector("#newCardBusiness").value.trim();
+    // Generate random 16 digit PAN starting with 4532
+    const randomSuffix = Math.floor(Math.random() * 1e12).toString().padStart(12, '0');
+    const number = `4532${randomSuffix}`;
+
     const card = {
-      id: `custom-${Date.now()}`,
       name: document.querySelector("#newCardName").value.trim(),
-      business,
-      token: `tok_custom_${bin}_${last4}_${Date.now()}`,
-      bin,
-      last4,
+      number: number,
       expiry: "2031-12",
-      expectedCode: code,
-      allowedProducts: products.length ? products : ["102"],
-      limit: Number(document.querySelector("#newCardLimit").value) || 100,
+      passcode: code,
+      balance: Number(document.querySelector("#newCardBalance").value) || 100,
       status: "ACTIVE",
-      offlineAllowed: false
     };
-    state.cards.push(card);
-    state.selectedCardId = card.id;
-    saveCards();
-    event.target.reset();
-    render();
+
+    fetch('http://localhost:3000/api/cards', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify(card) 
+    })
+    .then(res => res.json())
+    .then(data => { 
+      if (data.id) {
+        state.selectedCardId = data.id; 
+      }
+      event.target.reset(); 
+      loadCards(); 
+    })
+    .catch(console.error);
   }
 
   function copyLog() {
@@ -802,18 +736,13 @@ ${indent}</${name}>`;
     });
   }
 
-  function productByCode(code) {
-    return products.find((product) => product.product_code === code) || products[0];
-  }
-
   function productLabel(code) {
-    const product = productByCode(code);
-    return product.name + " (" + product.product_code + ")";
+    return code;
   }
 
-  function calculateQuantity(amount, unitPrice) {
-    if (!unitPrice) return "1";
-    return (Number(amount) / Number(unitPrice)).toFixed(3);
+  function calculateQuantity(amount, price) {
+    if (!amount || !price) return 0;
+    return parseFloat((amount / price).toFixed(2));
   }
 
   function toMoneyString(amount) {
@@ -874,7 +803,7 @@ ${indent}</${name}>`;
   el.removeCardBtn.addEventListener("click", removeCard);
   el.pinpad.addEventListener("click", handlePinpad);
   el.resetBtn.addEventListener("click", resetSimulator);
-  el.loadDefaultsBtn.addEventListener("click", resetDefaults);
+  el.loadDefaultsBtn.addEventListener("click", loadDefaults);
   el.cardForm.addEventListener("submit", addCard);
   el.clearLogBtn.addEventListener("click", clearLog);
   el.copyLogBtn.addEventListener("click", copyLog);

@@ -79,14 +79,14 @@
         </form>
 
         <div class="result-box" id="resultBox">
-          Configure a sale, pick a business card, then start the terminal flow.
+          Configure a sale, pick a card, then start the terminal flow.
         </div>
       </section>
 
       <section class="panel cards-panel" aria-labelledby="cardsTitle">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Business cards</p>
+            <p class="eyebrow">Cards</p>
             <h2 id="cardsTitle">Profiles</h2>
           </div>
           <button class="secondary" id="loadDefaultsBtn" type="button">Defaults</button>
@@ -94,43 +94,25 @@
         <div id="cardList" class="card-list"></div>
 
         <details class="new-card">
-          <summary>Add business card profile</summary>
+          <summary>Add card profile</summary>
           <form id="cardForm" class="card-form">
             <label>
               Card name
-              <input id="newCardName" placeholder="North Depot Fuel Card" required>
+              <input id="newCardName" placeholder="Personal or Business Name" required>
             </label>
-            <label>
-              Business
-              <input id="newCardBusiness" placeholder="Example Logistics Ltd" required>
-            </label>
-            <label>
-              BIN
-              <input id="newCardBin" inputmode="numeric" maxlength="8" placeholder="700001" required>
-            </label>
-            <label>
-              Last 4
-              <input id="newCardLast4" inputmode="numeric" maxlength="4" placeholder="1234" required>
+            <label style="display: none;">
+              Card Number
+              <input id="newCardNumber" inputmode="numeric" maxlength="16" placeholder="Auto-generated" value="4532000000000000">
             </label>
             <label>
               Auth code / PIN
               <input id="newCardCode" inputmode="numeric" maxlength="8" placeholder="4321" required>
             </label>
             <label>
-              Credit
-              <input id="newCardLimit" type="number" min="1" step="1" value="250">
+              Balance
+              <input id="newCardBalance" type="number" min="1" step="1" value="250">
             </label>
-            <label>
-              Allowed products
-              <select id="newCardProducts" multiple size="5">
-                <option value="102" selected>Diesel - 102</option>
-                <option value="101">Premium Unleaded - 101</option>
-                <option value="201">Coffee - 201</option>
-                <option value="301">Car Wash (Basic) - 301</option>
-                <option value="202">Sandwich - 202</option>
-              </select>
-            </label>
-            <button class="secondary" type="submit">Add profile</button>
+            <button class="primary" type="submit">Save profile</button>
           </form>
         </details>
       </section>

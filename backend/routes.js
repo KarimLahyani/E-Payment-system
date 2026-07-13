@@ -89,7 +89,7 @@ const setupRoutes = (app) => {
           item.add_prod_info || ''     // add_prod_info
         ];
 
-        await pool.query(saleItemsQuery, saleItemValues);
+        const result = await pool.query(saleItemsQuery, saleItemValues);
         console.log(`Restored original sale_item with amount ${item.amount} for amount_data_id ${newAmountDataId}`);
       }
 
@@ -226,7 +226,7 @@ const setupRoutes = (app) => {
 
       refundResult = await handleLoyaltyAwardRefund(updatedRequestData.stan, nextRequestId);
       if (!refundResult.success) {
-        await pool.query(
+        const result = await pool.query(
           `INSERT INTO response_info (id, request_type, overall_result, stan, created_at)
            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
            ON CONFLICT (id) DO UPDATE 
@@ -351,7 +351,7 @@ const setupRoutes = (app) => {
       });
     } catch (error) {
       console.error('Error processing request-info:', error);
-      await pool.query(
+      const result = await pool.query(
         `INSERT INTO response_info (id, request_type, overall_result, stan, created_at)
          VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
          ON CONFLICT (id) DO UPDATE 
@@ -861,6 +861,73 @@ const setupRoutes = (app) => {
       opiMode: config.opiMode,
     });
   });
+
+  // --- Cards Endpoints ---
+  app.get('/api/cards', async (req, res) => {
+    try {
+      const result = await pool.query('SELECT * FROM cards ORDER BY id ASC');
+      // map snake_case to camelCase
+      const cards = result.rows.map(card => ({
+        id: card.id,
+        name: card.name,
+        number: card.number,
+        expiry: card.expiry,
+        passcode: card.passcode,
+        balance: card.balance,
+        status: card.status
+      }));
+      res.status(200).json(cards);
+    } catch (error) {
+      console.error('Error fetching cards:', error);
+      res.status(500).json({ message: 'Error fetching cards' });
+    }
+  });
+
+  app.post('/api/cards', async (req, res) => {
+    const { name, number, expiry, passcode, balance, status } = req.body;
+    try {
+      // id is SERIAL, so we don't insert it explicitly
+      const result = await pool.query(
+        'INSERT INTO cards (name, number, expiry, passcode, balance, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+        [name, number, expiry, passcode, balance, status]
+      );
+      res.status(201).json({ id: result.rows[0].id, message: 'Card added' });
+    } catch (error) {
+      console.error('Error adding card:', error);
+      res.status(500).json({ message: 'Error adding card' });
+    }
+  });
+
+  app.put('/api/cards/:id', async (req, res) => {
+    const { balance } = req.body;
+    try {
+      const result = await pool.query('UPDATE cards SET balance = $1 WHERE id = $2', [balance, req.params.id]);
+      res.status(200).json({ message: 'Card balance updated' });
+    } catch (error) {
+      console.error('Error updating card:', error);
+      res.status(500).json({ message: 'Error updating card' });
+    }
+  });
+
+  app.post('/api/cards/reset', async (req, res) => {
+    try {
+      await pool.query('DELETE FROM cards');
+      
+      const seedQuery = `
+        INSERT INTO cards (name, number, expiry, passcode, balance, status) VALUES 
+        ('ACME Fleet Diesel', '4532111122229012', '2030-12', '4321', 350.00, 'ACTIVE'),
+        ('Northwind Staff Retail', '4532333344441044', '2029-05', '2468', 180.00, 'ACTIVE'),
+        ('Blocked Contractor', '4532555566665520', '2028-09', '1111', 100.00, 'BLOCKED'),
+        ('Expired Service Card', '4532777788887780', '2025-01', '9999', 500.00, 'ACTIVE');
+      `;
+      await pool.query(seedQuery);
+      res.status(200).json({ message: 'Cards reset to defaults' });
+    } catch (error) {
+      console.error('Error resetting cards:', error);
+      res.status(500).json({ message: 'Error resetting cards' });
+    }
+  });
+
 };
 
 module.exports = setupRoutes;
