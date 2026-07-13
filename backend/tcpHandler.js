@@ -284,8 +284,10 @@ const processCardServiceResponse = async (responseXML) => {
       totalAmount = totalAmount.toString().trim();
     }
     const tenderCurrency = rawTotalAmount?.['$']?.Currency || 'EUR';
+    const currencyLogos = { EUR: '€', USD: '$', GBP: '£' };
+    const currencyLogo = currencyLogos[tenderCurrency] || tenderCurrency;
     if (totalAmount !== '0') {
-      totalAmount = `${totalAmount} ${tenderCurrency}`;
+      totalAmount = `${totalAmount} ${currencyLogo}`;
     }
     console.log(`Extracted totalAmount: ${totalAmount}, Raw TotalAmount object: ${JSON.stringify(cardServiceResponse.Tender?.TotalAmount)}`);
 
