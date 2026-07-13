@@ -1,7 +1,7 @@
 const net = require('net');
 const os = require('os');
 const { generateLengthHeader } = require('./utils');
-const { parseXMLResponse } = require('./parseXMLResponse');
+
 const { pool } = require('./database');
 const xml2js = require('xml2js');
 const iconv = require('iconv-lite');
@@ -437,45 +437,49 @@ const sendMessage = async () => {
     return;
   }
 
+  let message = messagesToSend[messageIndex];
+  if (message instanceof Promise) {
+    message = await message;
+  }
+  const messageStr = typeof message === 'string' ? message : message.toString('latin1');
+  
+  // Send via WebSocket to Web-Based IFSF Simulator
+  if (typeof io !== 'undefined' && io) {
+    console.log('Sending message to Web-Based Simulator via WebSocket');
+    io.emit('terminal:request', messageStr);
+  }
+
+  // Also send via TCP if needed
+  if (client && !client.destroyed) {
+    client.destroy();
+  }
   client = new net.Socket();
+  
+  // Register listeners ONCE outside of attemptConnection
+  client.on('data', async (data) => {
+    let response;
+    if (configData.opiMode) {
+      response = data.slice(4).toString('latin1');
+      lastResponseXML = response;
+    } else {
+      response = data.toString('latin1');
+      lastResponseXML = response;
+    }
+    console.log(`Received ${messageIndex + 1} Response on channel2`);
+    console.log(response);
+
+    if (response.includes('CardServiceResponse')) {
+      await processCardServiceResponse(response);
+    }
+  });
+
+  client.on('end', () => {
+    messageIndex++;
+    setTimeout(sendMessage, 1000);
+  });
 
   const attemptConnection = async (retries = 3, delay = 1000) => {
-    client.connect(configData.posProxyPort, configData.clientIp, async () => {
-      let message = messagesToSend[messageIndex];
-      if (message instanceof Promise) {
-        message = await message;
-      }
-
-      const buffer = Buffer.isBuffer(message) ? message : Buffer.from(message, 'latin1');
-      console.log(`Sent message with header: length=${buffer.length}, message=${message.toString('latin1')}`);
-      client.write(buffer);
-      setTimeout(() => {
-        client.end();
-      }, 1000000);
-    });
-
-    client.on('data', async (data) => {
-      let response;
-      if (configData.opiMode) {
-        response = data.slice(4).toString('latin1');
-        lastResponseXML = response;
-      } else {
-        response = data.toString('latin1');
-        lastResponseXML = response;
-      }
-      console.log(`Received ${messageIndex + 1} Response on channel2`);
-      console.log(response);
-
-      if (response.includes('CardServiceResponse')) {
-        await processCardServiceResponse(response);
-      }
-    });
-
-    client.on('end', () => {
-      messageIndex++;
-      setTimeout(sendMessage, 1000000);
-    });
-
+    client.removeAllListeners('error');
     client.on('error', (err) => {
       if (retries > 0 && (err.code === 'ECONNREFUSED' || err.code === 'ECONNRESET')) {
         setTimeout(() => {
@@ -483,12 +487,23 @@ const sendMessage = async () => {
         }, delay);
       } else {
         messageIndex++;
-        setTimeout(sendMessage, 1000000);
+        setTimeout(sendMessage, 1000);
       }
+    });
+
+    client.connect(configData.posProxyPort, configData.clientIp, async () => {
+      const buffer = Buffer.isBuffer(message) ? message : Buffer.from(message, 'latin1');
+      console.log(`Sent message with header: length=${buffer.length}, message=${messageStr}`);
+      client.write(buffer);
+      setTimeout(() => {
+        if (!client.destroyed) {
+          client.end();
+        }
+      }, 1000000);
     });
   };
 
-  await attemptConnection();
+  attemptConnection();
 };
 
 const addMessageToSend = async (message) => {
@@ -512,7 +527,77 @@ const getLastDisplayMessage = () => lastDisplayMessage;
 const getLastPrinterMessage = () => lastPrinterMessage;
 const getLastCashierTerminalMessage = () => lastCashierTerminalMessage;
 
+
+let io;
+const setSocketIo = (socketIo) => {
+  io = socketIo;
+  io.on('connection', (socket) => {
+    console.log('Frontend terminal simulator connected');
+
+    socket.on('terminal:request', async (xmlMessage) => {
+      console.log('Received from frontend terminal simulator:');
+      console.log(xmlMessage);
+
+      if (xmlMessage.trim().startsWith('<?xml') || xmlMessage.trim().startsWith('<')) {
+        try {
+          const parser = new xml2js.Parser({ explicitArray: false, trim: true });
+          const parsedMessage = await parser.parseStringPromise(xmlMessage);
+          
+          await handleDeviceRequest(parsedMessage, (resp) => {
+            socket.emit('terminal:response', resp);
+          });
+        } catch (error) {
+          console.error(`Error processing WS XML message: ${error.message}`);
+        }
+      }
+    });
+
+    socket.on('terminal:response', async (responseXML) => {
+      console.log('Received terminal:response from POS web UI');
+      lastResponseXML = responseXML;
+      if (responseXML.includes('CardServiceResponse')) {
+        await processCardServiceResponse(responseXML);
+      }
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Frontend terminal simulator disconnected');
+    });
+  });
+};
+
+const handleDeviceRequest = async (parsedMessage, callback) => {
+  const deviceRequest = parsedMessage.EPSMessage?.DeviceRequest || parsedMessage.POSMessage?.DeviceRequest;
+  if (!deviceRequest) return;
+  
+  const device = deviceRequest.device;
+  const command = deviceRequest.command;
+  const text = deviceRequest.text;
+  
+  if (device === 'CashierDisplay') {
+    lastDisplayMessage = text;
+    console.log(`CashierDisplay message extracted: ${text}`);
+  } else if (device === 'Printer') {
+    lastPrinterMessage = text;
+    console.log(`Printer message extracted:`);
+    console.log(text);
+  } else if (device === 'CashierTerminal') {
+    lastCashierTerminalMessage = text;
+    console.log(`CashierTerminal message extracted: ${text}`);
+  }
+};
+
+
+const clearDeviceMessages = () => {
+  lastDisplayMessage = '';
+  lastPrinterMessage = '';
+  lastCashierTerminalMessage = '';
+  lastResponseXML = '';
+};
+
 module.exports = {
+  clearDeviceMessages,
+  setSocketIo,
   server,
   startTcpServer,
   addMessageToSend,
