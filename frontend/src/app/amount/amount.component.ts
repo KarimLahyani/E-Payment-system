@@ -21,10 +21,9 @@ export class AmountComponent implements OnInit, OnDestroy {
     currency: 'EUR',
     saleItems: [],
     itemDetails: {
-      itemId: '',
-      buttonLabel: '',
+      productName: '',
       productCode: '',
-      amount: '',
+      itemAmount: '',
       quantity: '',
       taxCode: '',
       addProdCode: '',
@@ -49,16 +48,16 @@ export class AmountComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    const currentData = (this.requestInfoService as any).currentData;
+    if (currentData && currentData.amountData) {
+      this.amountData = JSON.parse(JSON.stringify(currentData.amountData));
+    }
+    
     this.initializeSaleItems();
-    this.loadLastSaleItems();
+    // loadLastSaleItems will be called inside initializeSaleItems to avoid race conditions
     this.updateDisplayedItems();
-    this.loadLastAmountData();
     this.subscribeToDataChanges();
     this.updateAmountData();
-    const item1 = this.saleItemsList.find(item => item.buttonLabel === 'Item1');
-    if (item1) {
-      this.selectedSaleItem = { ...item1 };
-    }
   }
 
   ngOnDestroy(): void {
@@ -68,24 +67,44 @@ export class AmountComponent implements OnInit, OnDestroy {
   }
 
   private initializeSaleItems() {
-    this.saleItemsList = Array.from({ length: 35 }, (_, i) => ({
-      itemId: '',
-      buttonLabel: `Item${i + 1}`,
-      productCode: '',
-      amount: '',
-      quantity: '',
-      taxCode: '',
-      addProdCode: '',
-      reverseSale: '',
-      unitPrice: '',
-      unitMeasure: '',
-      saleChannel: '',
-      rebateLabel: '',
-      addProdInfo: '',
-      isSelected: false,
-      createdAt: ''
-    }));
-    this.amountData.saleItems = [...this.saleItemsList];
+    this.requestInfoService.getProducts().subscribe(
+      (products) => {
+        if (products && products.length > 0) {
+            this.saleItemsList = products.map(product => {
+              const existing = this.amountData.saleItems.find(i => i.productCode === product.productCode);
+              return {
+                productName: product.productName,
+                productCode: product.productCode,
+                itemAmount: existing?.itemAmount || '',
+                quantity: existing?.quantity || '',
+                taxCode: product.taxCode,
+                addProdCode: existing?.addProdCode || '',
+                reverseSale: existing?.reverseSale || '',
+                unitPrice: product.unitPrice,
+                unitMeasure: product.unitMeasure,
+                saleChannel: existing?.saleChannel || '',
+                rebateLabel: existing?.rebateLabel || '',
+                addProdInfo: existing?.addProdInfo || '',
+                isSelected: existing?.isSelected || false,
+                createdAt: existing?.createdAt || ''
+              };
+            });
+        } else {
+          // Fallback if no products
+          this.saleItemsList = [];
+        }
+        this.amountData.saleItems = [...this.saleItemsList];
+        this.updateDisplayedItems();
+        if (this.saleItemsList.length > 0) {
+          this.selectedSaleItem = { ...this.saleItemsList[0] };
+        }
+      },
+      (error) => {
+        console.error('Failed to initialize products in amount component', error);
+        this.saleItemsList = [];
+        this.amountData.saleItems = [...this.saleItemsList];
+      }
+    );
   }
 
   private loadLastSaleItems() {
@@ -94,20 +113,20 @@ export class AmountComponent implements OnInit, OnDestroy {
         console.log('Derniers SaleItems chargés (avant fusion):', JSON.stringify(saleItems, null, 2));
         if (saleItems && saleItems.length > 0) {
           this.saleItemsList = this.saleItemsList.map((defaultItem) => {
-            const matchingItem = saleItems.find(item => item.buttonLabel === defaultItem.buttonLabel);
+            const matchingItem = saleItems.find(item => item.productName === defaultItem.productName);
             if (matchingItem) {
               return {
                 ...defaultItem,
                 ...matchingItem,
-                itemId: defaultItem.itemId || matchingItem.itemId,
+                productName: defaultItem.productName || matchingItem.productName,
                 productCode: defaultItem.productCode || matchingItem.productCode,
-                amount: matchingItem.amount || defaultItem.amount,
+                itemAmount: matchingItem.itemAmount || defaultItem.itemAmount,
                 quantity: defaultItem.quantity || matchingItem.quantity,
                 taxCode: defaultItem.taxCode || matchingItem.taxCode,
                 addProdCode: defaultItem.addProdCode || matchingItem.addProdCode,
                 reverseSale: matchingItem.reverseSale || defaultItem.reverseSale || '0',
                 unitPrice: matchingItem.unitPrice || defaultItem.unitPrice,
-                unitMeasure: defaultItem.unitMeasure || matchingItem.unitMeasure,
+                unitMeasure: matchingItem.unitMeasure || defaultItem.unitMeasure,
                 saleChannel: defaultItem.saleChannel || matchingItem.saleChannel,
                 rebateLabel: matchingItem.rebateLabel || defaultItem.rebateLabel,
                 addProdInfo: defaultItem.addProdInfo || matchingItem.addProdInfo,
@@ -120,7 +139,7 @@ export class AmountComponent implements OnInit, OnDestroy {
           this.amountData.saleItems = [...this.saleItemsList];
           this.updateDisplayedItems();
           if (this.selectedSaleItem) {
-            const updatedItem = this.saleItemsList.find(i => i.buttonLabel === this.selectedSaleItem?.buttonLabel);
+            const updatedItem = this.saleItemsList.find(i => i.productName === this.selectedSaleItem?.productName);
             this.selectedSaleItem = updatedItem ? { ...updatedItem } : null;
           }
         }
@@ -135,97 +154,32 @@ export class AmountComponent implements OnInit, OnDestroy {
   }
 
   refreshAfterResponse(requestId: string) {
-    this.requestInfoService.getAmountDataForRequest(requestId).subscribe(
-      (storedAmountData: AmountData | null) => {
-        if (storedAmountData) {
-          console.log('amountData récupéré pour requestId:', requestId, JSON.stringify(storedAmountData, null, 2));
-          this.amountData = { ...this.amountData, ...storedAmountData };
-          this.saleItemsList = [...storedAmountData.saleItems];
-        } else {
-          console.warn('Aucun amountData trouvé pour requestId:', requestId);
-        }
-
-        this.requestInfoService.getLastSaleItems().subscribe(
-          (saleItems: SaleItem[]) => {
-            if (saleItems && saleItems.length > 0) {
-              console.log('saleItems reçus de getLastSaleItems:', JSON.stringify(saleItems, null, 2));
-              this.saleItemsList = this.saleItemsList.map((defaultItem) => {
-                const matchingItem = saleItems.find(item => item.buttonLabel === defaultItem.buttonLabel);
-                if (matchingItem) {
-                  const hasDiscount = matchingItem.rebateLabel && matchingItem.rebateLabel !== '';
-                  if (hasDiscount) {
-                    console.log(`Remise détectée pour ${matchingItem.buttonLabel}: ${matchingItem.rebateLabel}`);
-                  }
-                  return {
-                    ...defaultItem,
-                    amount: matchingItem.amount || defaultItem.amount,
-                    unitPrice: matchingItem.unitPrice || defaultItem.unitPrice,
-                    isSelected: matchingItem.isSelected !== undefined ? matchingItem.isSelected : defaultItem.isSelected,
-                    rebateLabel: matchingItem.rebateLabel || defaultItem.rebateLabel || '',
-                    reverseSale: matchingItem.reverseSale || defaultItem.reverseSale || '0',
-                    productCode: matchingItem.productCode || defaultItem.productCode,
-                    quantity: matchingItem.quantity || defaultItem.quantity,
-                    taxCode: matchingItem.taxCode || defaultItem.taxCode,
-                    addProdCode: matchingItem.addProdCode || defaultItem.addProdCode,
-                    unitMeasure: matchingItem.unitMeasure || defaultItem.unitMeasure,
-                    saleChannel: matchingItem.saleChannel || defaultItem.saleChannel,
-                    addProdInfo: matchingItem.addProdInfo || defaultItem.addProdInfo
-                  };
-                }
-                return defaultItem;
-              });
-              this.amountData.saleItems = [...this.saleItemsList];
-              console.log('saleItemsList après mise à jour:', JSON.stringify(this.saleItemsList, null, 2));
-              this.updateDisplayedItems();
-              if (this.selectedSaleItem) {
-                const updatedItem = this.saleItemsList.find(i => i.buttonLabel === this.selectedSaleItem?.buttonLabel);
-                this.selectedSaleItem = updatedItem ? { ...updatedItem } : null;
-              }
-
-              this.requestInfoService.getTotalAmount(requestId).subscribe(
-                (data: { totalAmount: string }) => {
-                  const totalAmount = parseFloat(data.totalAmount) || 0;
-                  this.amountData.totalAmount = totalAmount.toFixed(2);
-                  console.log('totalAmount mis à jour:', this.amountData.totalAmount);
-
-                  const itemsTotal = this.saleItemsList
-                    .filter(item => item.isSelected && item.reverseSale === '0')
-                    .reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-
-                  if (itemsTotal > totalAmount) {
-                    const discount = itemsTotal - totalAmount;
-                    console.log(`Remise calculée: ${discount.toFixed(2)} EUR`);
-                    this.amountData.discount = discount.toFixed(2);
-                  } else {
-                    console.log('Aucune remise détectée.');
-                    this.amountData.discount = '0.00';
-                  }
-
-                  this.requestInfoService.updateData({ amountData: this.amountData });
-                  this.cdr.detectChanges();
-                },
-                (error: HttpErrorResponse) => {
-                  console.error('Erreur lors de la récupération de totalAmount:', error);
-                }
-              );
-            } else {
-              console.warn('Aucun saleItem reçu de getLastSaleItems');
-            }
-          },
-          (error: HttpErrorResponse) => {
-            console.error('Erreur lors de la récupération des saleItems mis à jour:', error);
-          }
-        );
-      },
-      (error: HttpErrorResponse) => {
-        console.error('Erreur lors de la récupération de amountData pour requestId:', requestId, error);
-      }
-    );
+    // The user requested that after a transaction, the basket should clear to 0 and all items should be deselected 
+    // so the cashier is ready for the next customer.
+    console.log('Transaction finished for requestId:', requestId, '. Clearing basket for next customer.');
+    this.amountData.totalAmount = '0.00';
+    this.amountData.preAuthAmount = '0.00';
+    
+    // Deselect all items
+    this.saleItemsList = this.saleItemsList.map(item => ({
+      ...item,
+      isSelected: false,
+      quantity: '',
+      itemAmount: ''
+    }));
+    
+    this.amountData.saleItems = [];
+    this.selectedSaleItem = null;
+    
+    this.updateDisplayedItems();
+    this.requestInfoService.updateData({ amountData: this.amountData });
+    this.cdr.detectChanges();
   }
+
 
   private updateDisplayedItems() {
     this.displayedItems = this.saleItemsList.slice(this.currentIndex, this.currentIndex + this.itemsPerPage);
-    if (this.selectedSaleItem && !this.displayedItems.some(item => item.buttonLabel === this.selectedSaleItem?.buttonLabel)) {
+    if (this.selectedSaleItem && !this.displayedItems.some(item => item.productName === this.selectedSaleItem?.productName)) {
       this.selectedSaleItem = this.displayedItems[0] || null;
     }
     console.log('displayedItems mis à jour:', JSON.stringify(this.displayedItems, null, 2));
@@ -246,24 +200,43 @@ export class AmountComponent implements OnInit, OnDestroy {
   }
 
   selectItem(item: SaleItem) {
-    const updatedItem = this.saleItemsList.find(i => i.buttonLabel === item.buttonLabel);
-    this.selectedSaleItem = updatedItem ? { ...updatedItem } : null;
+    const updatedItem = this.saleItemsList.find(i => i.productName === item.productName);
+    if (updatedItem) {
+      updatedItem.isSelected = !updatedItem.isSelected;
+      
+      // Default quantity to 1 if selected and quantity is empty/0
+      if (updatedItem.isSelected) {
+        const qty = parseFloat(updatedItem.quantity) || 0;
+        if (qty === 0) {
+          updatedItem.quantity = '1';
+          const unitPrice = parseFloat(updatedItem.unitPrice) || 0;
+          updatedItem.itemAmount = (1 * unitPrice).toFixed(2);
+        }
+      } else {
+        // Optionally clear quantity if deselected, but usually better to leave it.
+      }
+      
+      this.selectedSaleItem = { ...updatedItem };
+      this.updateAmountData();
+    } else {
+      this.selectedSaleItem = null;
+    }
   }
 
   onSaleItemChange(updatedItem: SaleItem) {
     if (this.selectedSaleItem) {
-      this.selectedSaleItem = { ...updatedItem, buttonLabel: this.selectedSaleItem.buttonLabel };
-      const index = this.saleItemsList.findIndex(i => i.buttonLabel === updatedItem.buttonLabel);
+      this.selectedSaleItem = { ...updatedItem, productName: this.selectedSaleItem.productName };
+      const index = this.saleItemsList.findIndex(i => i.productName === updatedItem.productName);
       if (index !== -1) {
-        this.saleItemsList[index] = { ...updatedItem, buttonLabel: this.saleItemsList[index].buttonLabel };
+        this.saleItemsList[index] = { ...updatedItem, productName: this.saleItemsList[index].productName };
       }
-      const dataIndex = this.amountData.saleItems.findIndex(i => i.buttonLabel === updatedItem.buttonLabel);
+      const dataIndex = this.amountData.saleItems.findIndex(i => i.productName === updatedItem.productName);
       if (dataIndex !== -1) {
-        this.amountData.saleItems[dataIndex] = { ...updatedItem, buttonLabel: this.amountData.saleItems[dataIndex].buttonLabel };
+        this.amountData.saleItems[dataIndex] = { ...updatedItem, productName: this.amountData.saleItems[dataIndex].productName };
       }
-      const displayedIndex = this.displayedItems.findIndex(i => i.buttonLabel === updatedItem.buttonLabel);
+      const displayedIndex = this.displayedItems.findIndex(i => i.productName === updatedItem.productName);
       if (displayedIndex !== -1) {
-        this.displayedItems[displayedIndex] = { ...updatedItem, buttonLabel: this.displayedItems[displayedIndex].buttonLabel };
+        this.displayedItems[displayedIndex] = { ...updatedItem, productName: this.displayedItems[displayedIndex].productName };
       }
       this.updateAmountData();
       console.log('saleItemsList après mise à jour manuelle:', JSON.stringify(this.saleItemsList, null, 2));
@@ -271,11 +244,16 @@ export class AmountComponent implements OnInit, OnDestroy {
     }
   }
 
+  onManualAmountChange() {
+    console.log('Manual amount updated:', this.amountData);
+    this.requestInfoService.updateData({ amountData: this.amountData });
+  }
+
   private updateAmountData() {
     this.amountData.saleItems = [...this.saleItemsList];
     const total = this.saleItemsList
       .filter(item => item.isSelected)
-      .reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+      .reduce((sum, item) => sum + (parseFloat(item.itemAmount) || 0), 0);
     this.amountData.totalAmount = total.toFixed(2);
     console.log('Updated totalAmount (updateAmountData):', this.amountData.totalAmount);
     console.log('amountData avant envoi au service:', JSON.stringify(this.amountData, null, 2));
@@ -299,12 +277,10 @@ export class AmountComponent implements OnInit, OnDestroy {
   private subscribeToDataChanges() {
     this.dataSubscription = this.requestInfoService.dataChange$.subscribe((data: any) => {
       console.log('Données reçues via dataChange$:', JSON.stringify(data, null, 2));
-      if (data === true) {
-        console.log('Mise à jour globale détectée, rafraîchissement de AmountComponent');
-        this.loadLastSaleItems();
-        this.loadLastAmountData();
-        this.updateDisplayedItems();
-        this.cdr.detectChanges();
+    if (data === true) {
+      console.log('Mise à jour globale détectée, rafraîchissement de AmountComponent');
+      this.updateDisplayedItems();
+      this.cdr.detectChanges();
       } else if (typeof data === 'object' && data !== null) {
         if (data.refreshRequestId) {
           this.refreshAfterResponse(data.refreshRequestId);
@@ -314,14 +290,13 @@ export class AmountComponent implements OnInit, OnDestroy {
           const currentSaleItems = [...this.saleItemsList];
           this.amountData = { ...this.amountData, ...data.amountData };
           if (data.amountData.saleItems && data.amountData.saleItems.length > 0) {
-            this.saleItemsList = data.amountData.saleItems.map((item: SaleItem, index: number) => {
-              const existingItem = currentSaleItems.find(i => i.buttonLabel === `Item${index + 1}`);
+            this.saleItemsList = data.amountData.saleItems.map((item: SaleItem) => {
+              const existingItem = currentSaleItems.find(i => i.productCode === item.productCode || i.productName === item.productName);
               return {
                 ...item,
-                buttonLabel: `Item${index + 1}`,
-                itemId: existingItem?.itemId || item.itemId,
-                productCode: existingItem?.productCode || item.productCode,
-                amount: item.amount || existingItem?.amount,
+                productName: item.productName || existingItem?.productName || '',
+                productCode: item.productCode || existingItem?.productCode,
+                itemAmount: item.itemAmount || existingItem?.itemAmount,
                 quantity: existingItem?.quantity || item.quantity,
                 taxCode: existingItem?.taxCode || item.taxCode,
                 addProdCode: existingItem?.addProdCode || item.addProdCode,
@@ -337,7 +312,7 @@ export class AmountComponent implements OnInit, OnDestroy {
             });
             this.amountData.saleItems = [...this.saleItemsList];
             if (this.selectedSaleItem) {
-              const updatedItem = this.saleItemsList.find(i => i.buttonLabel === this.selectedSaleItem?.buttonLabel);
+              const updatedItem = this.saleItemsList.find(i => i.productName === this.selectedSaleItem?.productName);
               this.selectedSaleItem = updatedItem ? { ...updatedItem } : null;
             }
             this.updateDisplayedItems();

@@ -1,0 +1,14 @@
+{
+  "name": "ifsf-simulator-root",
+  "version": "1.0.0",
+  "description": "IFSF Simulator root package to run frontend and backend together",
+  "scripts": {
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm start",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

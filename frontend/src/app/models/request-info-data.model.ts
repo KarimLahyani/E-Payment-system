@@ -6,9 +6,8 @@ export const defaultRequestData: RequestInfo = {
   refNumber: '',
   appSender: '',
   popId: '',
-  workId: '',
+  workstationId: '',
   requestId: '',
-  autoIncrement: false,
   stan: '' // Nouveau champ ajouté
 };
 

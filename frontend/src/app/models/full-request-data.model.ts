@@ -2,10 +2,9 @@ export interface RequestData {
   requestType: string;
   popId: string;
   refNumber: string;
-  workId: string;
+  workstationId: string;
   appSender: string;
   requestId: string;
-  autoIncrement: boolean;
   requestTimestamp?: string;
   stan: string;
   clientIp?: string; // Ajouté
@@ -37,10 +36,9 @@ export interface PosData {
 }
 
 export interface SaleItem {
-  itemId: string;
-  buttonLabel: string;
+  productName: string;
   productCode: string;
-  amount: string;
+  itemAmount: string;
   quantity: string;
   taxCode: string;
   addProdCode: string;

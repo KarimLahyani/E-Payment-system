@@ -1,33 +1,26 @@
 const { pool } = require('./database');
 
-// Fonction pour normaliser les étiquettes de bouton
-const normalizeButtonLabel = (label) => label.charAt(0).toUpperCase() + label.slice(1);
+// Fonction pour normaliser les noms de produits
+const normalizeProductName = (label) => label.charAt(0).toUpperCase() + label.slice(1);
 
-// Préparer les valeurs pour l'insertion d'un SaleItem dans la base de données
 const prepareSaleItemValues = (item, amountDataId) => [
   amountDataId,
-  item.itemId || '',
-  item.buttonLabel || `Item${i}`, // Fallback si buttonLabel est absent
   item.productCode || '',
-  item.amount || '',
+  item.itemAmount || item.amount || '',
   item.quantity || '',
-  item.taxCode || '',
   item.addProdCode || '',
   item.reverseSale || '',
-  item.unitPrice || '',
-  item.unitMeasure || '',
   item.saleChannel || '',
   item.rebateLabel || '',
-  item.addProdInfo || '',
-  item.isSelected !== undefined ? item.isSelected : false
+  item.addProdInfo || ''
 ];
 
 // Transformer un SaleItem pour la réponse API
 const transformSaleItem = (item) => ({
   itemId: item.item_id || '',
-  buttonLabel: normalizeButtonLabel(item.button_label),
+  productName: normalizeProductName(item.product_name),
   productCode: item.product_code || '',
-  amount: item.amount || '',
+  itemAmount: item.amount || '',
   quantity: item.quantity || '',
   taxCode: item.tax_code || '',
   addProdCode: item.add_prod_code || '',
@@ -44,9 +37,9 @@ const transformSaleItem = (item) => ({
 // Générer des SaleItem par défaut
 const generateDefaultSaleItems = (count = 35) => Array.from({ length: count }, (_, i) => ({
   itemId: '',
-  buttonLabel: `Item${i + 1}`,
+  productName: `Item${i + 1}`,
   productCode: '',
-  amount: '',
+  itemAmount: '',
   quantity: '',
   taxCode: '',
   addProdCode: '',
@@ -80,7 +73,7 @@ const insertWithErrorHandling = async (query, values, successMessage) => {
 };
 
 module.exports = {
-  normalizeButtonLabel,
+  normalizeProductName,
   prepareSaleItemValues,
   transformSaleItem,
   generateDefaultSaleItems,

@@ -1,6 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
-import { RequestInfoService } from '../services/request-info.service';
-import { interval, Subscription } from 'rxjs';
+import { Component, Input } from '@angular/core';
 
 // Interface pour typer la réponse JSON
 interface ParsedResponse {
@@ -13,7 +11,7 @@ interface ParsedResponse {
     terminal: {
       terminalId: string;
       stan: string;
-      terminalBatch?: string; // Champ optionnel pour éviter les erreurs de typage
+      terminalBatch?: string;
     };
     tender: {
       totalAmount: {
@@ -28,34 +26,19 @@ interface ParsedResponse {
   templateUrl: './response-info.component.html',
   styleUrls: ['./response-info.component.css']
 })
-export class ResponseInfoComponent implements OnInit, OnDestroy {
-  responseData: ParsedResponse | null = null;
-  private refreshSubscription: Subscription | undefined;
+export class ResponseInfoComponent {
+  @Input() responseData: ParsedResponse | null = null;
+  @Input() expectedRequestId: string | number | null = null;
 
-  constructor(private requestInfoService: RequestInfoService) {}
+  get matchingResponse(): ParsedResponse | null {
+    if (!this.responseData) {
+      return null;
+    }
 
-  ngOnInit() {
-    this.loadResponseData();
-    // Rafraîchir les données toutes les 5 secondes
-    this.refreshSubscription = interval(5000).subscribe(() => {
-      this.loadResponseData();
-    });
-  }
+    const responseRequestId = this.responseData.cardServiceResponse?.attributes?.requestId?.toString();
+    const expectedRequestId = this.expectedRequestId?.toString();
 
-  ngOnDestroy() {
-    this.refreshSubscription?.unsubscribe();
-  }
-
-  private loadResponseData() {
-    this.requestInfoService.getLastResponseInfo().subscribe({
-      next: (data: ParsedResponse) => {
-        this.responseData = data;
-        console.log('ResponseInfoComponent received data:', this.responseData);
-      },
-      error: (err) => {
-        console.error('Error fetching response data:', err);
-        this.responseData = null; // Réinitialiser en cas d'erreur
-      }
-    });
+    return !expectedRequestId || responseRequestId === expectedRequestId ? this.responseData : null;
   }
 }
+

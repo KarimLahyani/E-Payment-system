@@ -56,7 +56,10 @@ export class RequestInfoService {
   private isProcessingCashierResponse = false;
 
   constructor(private http: HttpClient) {
-    this.startCashierTerminalPolling();
+  }
+
+  getProducts(): Observable<SaleItem[]> {
+    return this.http.get<SaleItem[]>(`${this.apiUrl}/products`);
   }
 
   getAmountDataForRequest(requestId: string): Observable<AmountData | null> {
@@ -115,11 +118,9 @@ export class RequestInfoService {
     return this.http.post<RequestInfoResponse>(`${this.apiUrl}/request-info`, data, { headers }).pipe(
       tap(response => {
         console.log('Réponse du serveur dans sendRequestInfo:', response);
-        this.notifyGlobalUpdate();
       }),
       catchError(error => {
         console.error('Erreur dans sendRequestInfo:', error);
-        this.notifyGlobalUpdate();
         return throwError(error);
       })
     );
@@ -144,8 +145,22 @@ export class RequestInfoService {
     );
   }
 
+  getResponseInfoById(id: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/response-info/${id}?t=${new Date().getTime()}`);
+  }
+
+  getNextRequestId(): Observable<{ requestId: number }> {
+    return this.http.get<{ requestId: number }>(`${this.apiUrl}/last-request-info?t=${new Date().getTime()}`).pipe(
+      tap(data => console.log('Next request id fetched:', data)),
+      catchError(error => {
+        console.error('Erreur lors de la récupération de getNextRequestId:', error);
+        return throwError(error);
+      })
+    );
+  }
+
   getLastRequestInfo(): Observable<RequestData> {
-    return this.http.get<RequestData>(`${this.apiUrl}/last-request-info`).pipe(
+    return this.http.get<RequestData>(`${this.apiUrl}/last-request-info?t=${new Date().getTime()}`).pipe(
       tap(data => console.log('Last request info fetched:', data)),
       catchError(error => {
         console.error('Erreur lors de la récupération de last-request-info:', error);
@@ -194,10 +209,9 @@ export class RequestInfoService {
         requestType: '',
         popId: '',
         refNumber: '',
-        workId: '',
+        workstationId: '',
         appSender: '',
         requestId: '',
-        autoIncrement: false,
         stan: '',
       },
       posData: data.posData || this.currentData?.posData || {
@@ -225,10 +239,9 @@ export class RequestInfoService {
         preAuthAmount: '',
         currency: 'EUR',
         saleItems: Array.from({ length: 35 }, (_, i) => ({
-          itemId: `Item${i + 1}`,
-          buttonLabel: `Item${i + 1}`,
+          productName: `Item${i + 1}`,
           productCode: '',
-          amount: '',
+          itemAmount: '',
           quantity: '',
           taxCode: '',
           addProdCode: '',
@@ -242,10 +255,9 @@ export class RequestInfoService {
           createdAt: '',
         })),
         itemDetails: {
-          itemId: '',
-          buttonLabel: '',
+          productName: '',
           productCode: '',
-          amount: '',
+          itemAmount: '',
           quantity: '',
           taxCode: '',
           addProdCode: '',
@@ -328,13 +340,14 @@ export class RequestInfoService {
   }
 
   fetchDeviceMessages(): void {
-    this.http.get<{ display: string, printer: string }>(`${this.apiUrl}/device-messages`).pipe(
+    this.http.get<{ display: string, printer: string, cashierTerminal: string }>(`${this.apiUrl}/device-messages`).pipe(
       tap(messages => {
-        console.log('Messages reçus pour display et printer:', messages);
+        console.log('Messages reçus pour display, printer et cashierTerminal:', messages);
         this.deviceMessagesSubject.next({
           ...this.deviceMessagesSubject.value,
           display: messages.display,
           printer: messages.printer,
+          cashierTerminal: messages.cashierTerminal,
         });
       }),
       catchError(error => {
@@ -343,23 +356,14 @@ export class RequestInfoService {
           ...this.deviceMessagesSubject.value,
           display: '',
           printer: '',
+          cashierTerminal: '',
         });
-        return of({ display: '', printer: '' });
+        return throwError(error);
       })
     ).subscribe();
   }
 
-  getCashierTerminalMessage(): Observable<{ message: string }> {
-    return this.http.get<{ message: string }>(`${this.apiUrl}/cashier-terminal-message`).pipe(
-      tap(data => console.log('Message CashierTerminal reçu du backend:', data)),
-      catchError(error => {
-        console.error('Erreur lors de la récupération du message CashierTerminal:', error);
-        return of({ message: '' });
-      })
-    );
-  }
-
-  sendCashierTerminalResponse(confirmation: 'YES' | 'NO'): Observable<{ message: string }> {
+  sendCashierTerminalResponse(confirmation: string): Observable<{ message: string }> {
     if (this.isProcessingCashierResponse) {
       console.warn('Une réponse CashierTerminal est déjà en cours de traitement, annulation.');
       return throwError(() => new Error('Response already in progress'));
@@ -390,26 +394,6 @@ export class RequestInfoService {
         this.isProcessingCashierResponse = false;
       })
     );
-  }
-
-  private startCashierTerminalPolling(): void {
-    setInterval(() => {
-      if (!this.isProcessingCashierResponse) {
-        console.log('Lancement d\'un nouveau polling pour CashierTerminal');
-        this.getCashierTerminalMessage().subscribe(data => {
-          console.log('Résultat du polling CashierTerminal:', data);
-          if (data.message && data.message !== this.deviceMessagesSubject.value.cashierTerminal) {
-            console.log('Nouveau message CashierTerminal détecté:', data.message);
-            this.deviceMessagesSubject.next({
-              ...this.deviceMessagesSubject.value,
-              cashierTerminal: data.message,
-            });
-          }
-        });
-      } else {
-        console.log('Polling sauté: une réponse CashierTerminal est en cours de traitement');
-      }
-    }, 500); // Réduit à 500ms pour une détection plus rapide
   }
 
   notifyGlobalUpdate() {

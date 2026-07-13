@@ -25,7 +25,7 @@ export const defaultDisabledFields = {
     preAuthAmount: false,
     currency: false,
     saleItems: false,
-    itemId: false,
+    productName: false,
     productCode: false,
     amount: false,
     quantity: false,
@@ -83,7 +83,6 @@ export interface DisabledFields {
     preAuthAmount: boolean;
     currency: boolean;
     saleItems: boolean;
-    itemId: boolean;
     productCode: boolean;
     amount: boolean;
     quantity: boolean;

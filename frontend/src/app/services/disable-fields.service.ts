@@ -51,7 +51,6 @@ export class DisableFieldsService {
         disabledFields.amount.preAuthAmount = true;
         disabledFields.amount.currency = true;
         disabledFields.amount.saleItems = true;
-        disabledFields.amount.itemId = true;
         disabledFields.amount.productCode = true;
         disabledFields.amount.amount = true;
         disabledFields.amount.quantity = true;
@@ -100,7 +99,6 @@ export class DisableFieldsService {
         disabledFields.amount.preAuthAmount = true;
         disabledFields.amount.currency = true;
         disabledFields.amount.saleItems = true;
-        disabledFields.amount.itemId = true;
         disabledFields.amount.productCode = true;
         disabledFields.amount.amount = true;
         disabledFields.amount.quantity = true;

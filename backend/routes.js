@@ -1,13 +1,10 @@
 const { pool } = require('./database');
 const { insertWithErrorHandling, prepareSaleItemValues, transformSaleItem, generateDefaultSaleItems } = require('./utils');
 const { generateServiceRequest, updateConfigData: updateXmlConfigData } = require('./xmlGenerator');
-const { addMessageToSend, updateConfigData: updateTcpConfigData, restartTcpServer, getConfigData, getLastResponseXML, getLastDisplayMessage, getLastPrinterMessage, processCardServiceResponse, setCashierTerminalCallback, resetCashierTerminalCallback } = require('./tcphandler');
+const { addMessageToSend, updateConfigData: updateTcpConfigData, restartTcpServer, getConfigData, getLastResponseXML, getLastDisplayMessage, getLastPinPadMessage, getLastPrinterMessage, processCardServiceResponse, resolveCashierTerminalResponse, getLastCashierTerminalMessage, clearDeviceMessages } = require('./tcpHandler');
 
 // Variable globale pour stocker le dernier message XML généré
 let lastServiceRequest = '';
-
-// Variable globale pour stocker le callback CashierTerminal
-let cashierTerminalCallback = null;
 
 const setupRoutes = (app) => {
   // Function to handle LoyaltyAwardRefund
@@ -35,7 +32,7 @@ const setupRoutes = (app) => {
 
       // Step 2: Find all amount_data entries for the LoyaltyAward request
       const amountDataResult = await pool.query(
-        'SELECT id, total_amount, pre_auth_amount, currency, item_details FROM amount_data WHERE request_info_id = $1 ORDER BY created_at',
+        'SELECT id, total_amount, pre_auth_amount, currency FROM amount_data WHERE request_info_id = $1 ORDER BY created_at',
         [loyaltyAwardRequestId]
       );
 
@@ -56,13 +53,13 @@ const setupRoutes = (app) => {
       const originalTotalAmount = highestAmountData.total_amount;
       const preAuthAmount = highestAmountData.pre_auth_amount || '';
       const currency = highestAmountData.currency || 'EUR';
-      const itemDetails = highestAmountData.item_details || {};
+      
       console.log(`Highest total_amount found: ${originalTotalAmount} with amount_data.id: ${originalAmountDataId}`);
 
       // Step 3: Insert a new row in amount_data with the original total_amount
       const newAmountResult = await pool.query(
-        'INSERT INTO amount_data (total_amount, pre_auth_amount, currency, item_details, request_info_id, created_at) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP) RETURNING id',
-        [originalTotalAmount, preAuthAmount, currency, JSON.stringify(itemDetails), currentRequestId]
+        'INSERT INTO amount_data (total_amount, pre_auth_amount, currency, request_info_id, created_at) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP) RETURNING id',
+        [originalTotalAmount, preAuthAmount, currency, currentRequestId]
       );
       const newAmountDataId = newAmountResult.rows[0].id;
       console.log(`Successfully inserted new row in amount_data with id ${newAmountDataId} and total_amount ${originalTotalAmount} for request_info_id ${currentRequestId}`);
@@ -74,32 +71,26 @@ const setupRoutes = (app) => {
       );
 
       const saleItemsQuery = `
-        INSERT INTO sale_items (amount_data_id, item_id, button_label, product_code, amount, quantity, tax_code, add_prod_code, reverse_sale, unit_price, unit_measure, sale_channel, rebate_label, add_prod_info, is_selected, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
+        INSERT INTO sale_items (amount_data_id, product_code, amount, quantity, add_prod_code, reverse_sale, sale_channel, rebate_label, add_prod_info, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
         RETURNING *
       `;
 
       for (const item of originalSaleItemsResult.rows) {
         const saleItemValues = [
           newAmountDataId,             // amount_data_id (new)
-          item.item_id,                // item_id
-          item.button_label || '',     // button_label
           item.product_code || '',     // product_code
-          item.amount,                 // amount (original amount)
+          item.amount,                 // amount
           item.quantity || '',         // quantity
-          item.tax_code || '',         // tax_code
           item.add_prod_code || '',    // add_prod_code
           item.reverse_sale || '0',    // reverse_sale
-          item.unit_price || '',       // unit_price
-          item.unit_measure || '',     // unit_measure
           item.sale_channel || '',     // sale_channel
           '',                          // rebate_label (reset to empty)
-          item.add_prod_info || '',    // add_prod_info
-          item.is_selected || false,   // is_selected
+          item.add_prod_info || ''     // add_prod_info
         ];
 
         await pool.query(saleItemsQuery, saleItemValues);
-        console.log(`Restored original sale_item ${item.item_id} with amount ${item.amount} for amount_data_id ${newAmountDataId}`);
+        console.log(`Restored original sale_item with amount ${item.amount} for amount_data_id ${newAmountDataId}`);
       }
 
       return { success: true, message: 'LoyaltyAward discounts undone successfully.' };
@@ -109,49 +100,45 @@ const setupRoutes = (app) => {
     }
   };
 
-  // Function to handle CashierTerminal response
-  const handleCashierTerminalResponse = (confirmation, callback) => {
-    if (cashierTerminalCallback) {
-      cashierTerminalCallback(confirmation);
-      resetCashierTerminalCallback();
-      callback(null);
-    } else {
-      callback('No pending CashierTerminal request');
-    }
-  };
-
   // Endpoint pour récupérer le dernier message CashierTerminal
-  app.get('/cashier-terminal-message', (req, res) => {
+
+  app.get('/products', async (req, res) => {
     try {
-      const message = getLastCashierTerminalMessage();
-      console.log('Route /cashier-terminal-message appelée, message:', message);
-
-      // Définir un callback pour attendre la réponse du frontend
-      setCashierTerminalCallback((message, callback) => {
-        cashierTerminalCallback = callback;
-        console.log('Callback CashierTerminal défini dans /cashier-terminal-message avec message:', message);
-      });
-
-      res.status(200).json({ message });
+      const result = await pool.query(`
+        SELECT
+          name as "productName",
+          product_code as "productCode",
+          unit_price::text as "unitPrice",
+          unit_measure as "unitMeasure",
+          tax_code as "taxCode"
+        FROM products
+        ORDER BY product_code ASC
+      `);
+      res.status(200).json(result.rows);
     } catch (error) {
-      console.error('Erreur lors de la récupération du message CashierTerminal:', error);
-      res.status(500).json({ message: 'Internal server error', error: error.message });
+      console.error('Error fetching products:', error);
+      res.status(500).json({ message: 'Internal server error fetching products' });
     }
   });
 
-  // Endpoint pour envoyer la réponse YES/NO du frontend
+  // Endpoint pour envoyer la reponse du terminal UI (YES, NO, ou code numerique)
   app.post('/cashier-terminal-response', (req, res) => {
-    const { confirmation } = req.body; // 'YES' ou 'NO'
-    if (!['YES', 'NO'].includes(confirmation)) {
-      return res.status(400).json({ message: 'Invalid confirmation value. Must be YES or NO.' });
+    const { confirmation } = req.body;
+    const responseValue = String(confirmation || '').trim();
+
+    if (!responseValue || !(/^(YES|NO)$/i.test(responseValue) || /^\d{4,8}$/.test(responseValue))) {
+      return res.status(400).json({ message: 'Invalid terminal response. Use YES, NO, or a 4-8 digit code.' });
     }
 
-    handleCashierTerminalResponse(confirmation, (error) => {
-      if (error) {
-        return res.status(400).json({ message: error });
-      }
-      res.status(200).json({ message: 'Response sent successfully' });
-    });
+    const resolved = resolveCashierTerminalResponse(responseValue.toUpperCase() === 'YES' || responseValue.toUpperCase() === 'NO'
+      ? responseValue.toUpperCase()
+      : responseValue);
+
+    if (!resolved) {
+      return res.status(400).json({ message: 'No pending CashierTerminal request' });
+    }
+
+    res.status(200).json({ message: 'Response sent successfully' });
   });
 
   // Endpoint pour récupérer les messages DeviceRequest
@@ -159,9 +146,11 @@ const setupRoutes = (app) => {
     try {
       const displayMessage = getLastDisplayMessage();
       const printerMessage = getLastPrinterMessage();
+      const cashierTerminalMessage = getLastCashierTerminalMessage();
       res.status(200).json({
         display: displayMessage,
         printer: printerMessage,
+        cashierTerminal: cashierTerminalMessage
       });
     } catch (error) {
       console.error('Erreur lors de la récupération des messages DeviceRequest:', error);
@@ -211,8 +200,9 @@ const setupRoutes = (app) => {
 
     const updatedAmountData = { ...amountData, saleItems: selectedSaleItems };
 
-    // Ignorer le RequestID fourni dans requestData
-    const updatedRequestData = { ...requestData, requestId: null }; // On met requestId à null pour l'instant
+    const updatedRequestData = { ...requestData, requestId: null };
+
+    clearDeviceMessages();
 
     // Handle LoyaltyAwardRefund before generating the XML
     let refundResult = { success: true, message: '' };
@@ -220,14 +210,14 @@ const setupRoutes = (app) => {
 
     if (updatedRequestData.requestType === 'LoyaltyAwardRefund' && updatedRequestData.stan) {
       const requestResult = await pool.query(
-        'INSERT INTO request_info (request_type, pop_id, ref_number, work_id, app_sender, auto_increment, stan, request_timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP) RETURNING id',
+        'INSERT INTO request_info (request_type, pop_id, ref_number, workstation_id, app_sender, stan, request_timestamp) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP) RETURNING id',
         [
           updatedRequestData.requestType || null,
           updatedRequestData.popId || null,
           updatedRequestData.refNumber || null,
           updatedRequestData.workId || null,
           updatedRequestData.appSender || null,
-          updatedRequestData.autoIncrement === true || updatedRequestData.autoIncrement === 'true' || false,
+          
           updatedRequestData.stan || null,
         ]
       );
@@ -240,73 +230,30 @@ const setupRoutes = (app) => {
           `INSERT INTO response_info (id, request_type, overall_result, stan, created_at)
            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
            ON CONFLICT (id) DO UPDATE 
-           SET request_type = $2, overall_result = $3, stan = $4, updated_at = CURRENT_TIMESTAMP`,
+           SET request_type = $2, overall_result = $3, stan = $4`,
           [nextRequestId, updatedRequestData.requestType, 'Failed', updatedRequestData.stan]
         );
         console.log(`Inserted/Updated response_info for failed LoyaltyAwardRefund request with id ${nextRequestId}`);
         return res.status(400).json({ message: refundResult.message });
       }
     } else {
-      const autoIncrement = updatedRequestData.autoIncrement === true || updatedRequestData.autoIncrement === 'true' || false;
-
-      if (autoIncrement) {
-        const requestResult = await pool.query(
-          'INSERT INTO request_info (request_type, pop_id, ref_number, work_id, app_sender, auto_increment, stan, request_timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP) RETURNING id',
-          [
-            updatedRequestData.requestType || null,
-            updatedRequestData.popId || null,
-            updatedRequestData.refNumber || null,
-            updatedRequestData.workId || null,
-            updatedRequestData.appSender || null,
-            autoIncrement,
-            updatedRequestData.stan || null,
-          ]
-        );
-        nextRequestId = requestResult.rows[0].id;
-        console.log('Inserted new request_info with id:', nextRequestId);
-      } else {
-        const lastRequestResult = await pool.query(
-          'SELECT id FROM request_info WHERE request_timestamp IS NOT NULL ORDER BY request_timestamp DESC LIMIT 1'
-        );
-
-        if (lastRequestResult.rows.length === 0) {
-          const requestResult = await pool.query(
-            'INSERT INTO request_info (request_type, pop_id, ref_number, work_id, app_sender, auto_increment, stan, request_timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP) RETURNING id',
-            [
-              updatedRequestData.requestType || null,
-              updatedRequestData.popId || null,
-              updatedRequestData.refNumber || null,
-              updatedRequestData.workId || null,
-              updatedRequestData.appSender || null,
-              autoIncrement,
-              updatedRequestData.stan || null,
-            ]
-          );
-          nextRequestId = requestResult.rows[0].id;
-          console.log('No previous request_info found, inserted new with id:', nextRequestId);
-        } else {
-          nextRequestId = lastRequestResult.rows[0].id;
-          await pool.query(
-            `UPDATE request_info 
-             SET request_type = $1, pop_id = $2, ref_number = $3, work_id = $4, app_sender = $5, auto_increment = $6, stan = $7, request_timestamp = CURRENT_TIMESTAMP
-             WHERE id = $8`,
-            [
-              updatedRequestData.requestType || null,
-              updatedRequestData.popId || null,
-              updatedRequestData.refNumber || null,
-              updatedRequestData.workId || null,
-              updatedRequestData.appSender || null,
-              autoIncrement,
-              updatedRequestData.stan || null,
-              nextRequestId,
-            ]
-          );
-          console.log('Updated existing request_info with id:', nextRequestId);
-        }
-      }
+      const requestResult = await pool.query(
+        'INSERT INTO request_info (request_type, pop_id, ref_number, workstation_id, app_sender, stan, request_timestamp) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP) RETURNING id',
+        [
+          updatedRequestData.requestType || null,
+          updatedRequestData.popId || null,
+          updatedRequestData.refNumber || null,
+          updatedRequestData.workId || null,
+          updatedRequestData.appSender || null,
+          
+          updatedRequestData.stan || null,
+        ]
+      );
+      nextRequestId = requestResult.rows[0].id;
+      console.log('Inserted new request_info with id:', nextRequestId);
     }
 
-    // Mettre à jour updatedRequestData.requestId avec l'id généré
+    // Mettre à  jour updatedRequestData.requestId avec l'id généré
     updatedRequestData.requestId = nextRequestId.toString();
 
     // Générer le service request XML
@@ -320,10 +267,6 @@ const setupRoutes = (app) => {
       const requestId = nextRequestId;
 
       if (posData) {
-        if (!updatedRequestData.autoIncrement && updatedRequestData.requestType !== 'LoyaltyAwardRefund') {
-          await pool.query('DELETE FROM pos_data WHERE request_info_id = $1', [requestId]);
-        }
-
         const posValues = [
           posData.posTimestamp || null,
           posData.languageCode || null,
@@ -353,32 +296,18 @@ const setupRoutes = (app) => {
       }
 
       if (amountData && updatedRequestData.requestType !== 'LoyaltyAwardRefund') {
-        if (!updatedRequestData.autoIncrement) {
-          const existingAmountData = await pool.query(
-            'SELECT id FROM amount_data WHERE request_info_id = $1 ORDER BY created_at DESC LIMIT 1',
-            [requestId]
-          );
-          if (existingAmountData.rows.length > 0) {
-            const amountDataIdToDelete = existingAmountData.rows[0].id;
-            await pool.query('DELETE FROM sale_items WHERE amount_data_id = $1', [amountDataIdToDelete]);
-            await pool.query('DELETE FROM amount_data WHERE id = $1', [amountDataIdToDelete]);
-          }
-        }
-
         const { totalAmount, preAuthAmount, currency, itemDetails } = amountData;
 
-        const amountResult = await pool.query(
-          'INSERT INTO amount_data (total_amount, pre_auth_amount, currency, item_details, request_info_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-          [totalAmount || '0', preAuthAmount || '', currency || 'EUR', JSON.stringify(itemDetails || {}), requestId]
-        );
+          const amountResult = await pool.query(
+            'INSERT INTO amount_data (total_amount, pre_auth_amount, currency, request_info_id) VALUES ($1, $2, $3, $4) RETURNING id',
+            [totalAmount || '0', preAuthAmount || '', currency || 'EUR', requestId]
+          );
         const amountDataId = amountResult.rows[0].id;
         console.log('Inserted amount_data with id:', amountDataId, 'for request_info_id:', requestId);
 
-        await pool.query('DELETE FROM sale_items WHERE amount_data_id = $1', [amountDataId]);
-
         const saleItemsQuery = `
-          INSERT INTO sale_items (amount_data_id, item_id, button_label, product_code, amount, quantity, tax_code, add_prod_code, reverse_sale, unit_price, unit_measure, sale_channel, rebate_label, add_prod_info, is_selected, created_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
+          INSERT INTO sale_items (amount_data_id, product_code, amount, quantity, add_prod_code, reverse_sale, sale_channel, rebate_label, add_prod_info, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
           RETURNING *
         `;
 
@@ -386,16 +315,12 @@ const setupRoutes = (app) => {
           await insertWithErrorHandling(
             saleItemsQuery,
             prepareSaleItemValues(item, amountDataId),
-            `Successfully inserted sale_item ${item.buttonLabel}:`
+            `Successfully inserted sale_item:`
           );
         }
       }
 
       if (loyaltyData) {
-        if (!updatedRequestData.autoIncrement && updatedRequestData.requestType !== 'LoyaltyAwardRefund') {
-          await pool.query('DELETE FROM loyalty WHERE request_info_id = $1', [requestId]);
-        }
-
         const loyaltyValues = [
           loyaltyData.loyaltyFlag || false,
           loyaltyData.cardEntryMode || null,
@@ -430,7 +355,7 @@ const setupRoutes = (app) => {
         `INSERT INTO response_info (id, request_type, overall_result, stan, created_at)
          VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
          ON CONFLICT (id) DO UPDATE 
-         SET request_type = $2, overall_result = $3, stan = $4, updated_at = CURRENT_TIMESTAMP`,
+         SET request_type = $2, overall_result = $3, stan = $4`,
         [nextRequestId, updatedRequestData.requestType, 'Failed', updatedRequestData.stan]
       );
       console.log(`Inserted/Updated response_info for failed request with id ${nextRequestId}`);
@@ -527,6 +452,43 @@ const setupRoutes = (app) => {
     }
   });
 
+    app.get('/response-info/:id', async (req, res) => {
+      try {
+        const id = parseInt(req.params.id, 10);
+        const result = await pool.query(
+          'SELECT * FROM response_info WHERE id = $1 ORDER BY created_at DESC LIMIT 1',
+          [id]
+        );
+        if (result.rows.length > 0) {
+          const responseData = result.rows[0];
+          res.status(200).json({
+            cardServiceResponse: {
+              attributes: {
+                requestType: responseData.request_type || '',
+                overallResult: responseData.overall_result || '',
+                requestId: responseData.id || '',
+              },
+              terminal: {
+                terminalId: responseData.terminal_id || '',
+                stan: responseData.stan ?? '',
+                terminalBatch: responseData.terminal_batch ?? '',
+              },
+              tender: {
+                totalAmount: {
+                  value: responseData.amount || '',
+                },
+              },
+            },
+          });
+        } else {
+          res.status(404).json({ message: 'No response info available for this ID' });
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération de /response-info/:id:', error);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
   app.get('/last-service-request', (req, res) => {
     if (!lastServiceRequest) {
       return res.status(404).json({ message: 'No Service Request available' });
@@ -573,25 +535,29 @@ const setupRoutes = (app) => {
 
   app.get('/last-request-info', async (req, res) => {
     try {
+      const nextIdResult = await pool.query('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM request_info');
+      const nextRequestId = nextIdResult.rows[0].next_id.toString();
+
       const result = await pool.query(
         'SELECT * FROM request_info WHERE request_timestamp IS NOT NULL ORDER BY request_timestamp DESC LIMIT 1'
       );
+
       if (result.rows.length > 0) {
         const requestData = result.rows[0];
         const responseData = {
           requestType: requestData.request_type || '',
           popId: requestData.pop_id || '',
           refNumber: requestData.ref_number || '',
-          workId: requestData.work_id || '',
+          workId: requestData.workstation_id || '',
           appSender: requestData.app_sender || '',
           id: requestData.id || '',
-          autoIncrement: requestData.auto_increment || false,
+          requestId: nextRequestId, // Use nextRequestId so the form shows the upcoming ID
           requestTimestamp: requestData.request_timestamp || '',
           stan: requestData.stan || '',
         };
         res.status(200).json(responseData);
       } else {
-        res.status(404).json({ message: 'No request info found with a valid timestamp' });
+        res.status(200).json({ requestId: nextRequestId });
       }
     } catch (error) {
       console.error('Erreur lors de la récupération des données de request_info:', error);
@@ -607,9 +573,11 @@ const setupRoutes = (app) => {
       if (result.rows.length > 0) {
         const amountData = result.rows[0];
         const saleItemsResult = await pool.query(
-          `SELECT * FROM sale_items 
-           WHERE amount_data_id = $1 
-           ORDER BY CAST(SUBSTRING(button_label FROM '[0-9]+') AS INTEGER)`,
+          `SELECT si.*, p.name as button_label, p.unit_price, p.unit_measure, p.tax_code 
+           FROM sale_items si 
+           LEFT JOIN products p ON si.product_code = p.product_code 
+           WHERE si.amount_data_id = $1 
+           ORDER BY si.id`,
           [amountData.id]
         );
 
@@ -644,7 +612,7 @@ const setupRoutes = (app) => {
             saleChannel: item.sale_channel || '',
             rebateLabel: item.rebate_label || '',
             addProdInfo: item.add_prod_info || '',
-            isSelected: item.is_selected || false,
+            isSelected: true,
             createdAt: item.created_at || '',
           })),
         };
@@ -678,9 +646,11 @@ const setupRoutes = (app) => {
       if (result.rows.length > 0) {
         const amountData = result.rows[0];
         const saleItemsResult = await pool.query(
-          `SELECT * FROM sale_items 
-           WHERE amount_data_id = $1 
-           ORDER BY CAST(SUBSTRING(button_label FROM '[0-9]+') AS INTEGER)`,
+          `SELECT si.*, p.name as button_label, p.unit_price, p.unit_measure, p.tax_code 
+           FROM sale_items si 
+           LEFT JOIN products p ON si.product_code = p.product_code 
+           WHERE si.amount_data_id = $1 
+           ORDER BY si.id`,
           [amountData.id]
         );
 
@@ -715,7 +685,7 @@ const setupRoutes = (app) => {
             saleChannel: item.sale_channel || '',
             rebateLabel: item.rebate_label || '',
             addProdInfo: item.add_prod_info || '',
-            isSelected: item.is_selected || false,
+            isSelected: true,
             createdAt: item.created_at || '',
           })),
         };
@@ -732,7 +702,10 @@ const setupRoutes = (app) => {
   app.get('/last-sale-items', async (req, res) => {
     try {
       const result = await pool.query(
-        'SELECT * FROM sale_items WHERE created_at IS NOT NULL ORDER BY created_at DESC LIMIT 35'
+        `SELECT si.*, p.name as button_label, p.unit_price, p.unit_measure, p.tax_code 
+         FROM sale_items si 
+         LEFT JOIN products p ON si.product_code = p.product_code 
+         WHERE si.created_at IS NOT NULL ORDER BY si.created_at DESC LIMIT 35`
       );
       if (result.rows.length > 0) {
         const saleItems = result.rows.map(item => ({
@@ -749,7 +722,7 @@ const setupRoutes = (app) => {
           saleChannel: item.sale_channel || '',
           rebateLabel: item.rebate_label || '',
           addProdInfo: item.add_prod_info || '',
-          isSelected: item.is_selected || false,
+          isSelected: true,
           createdAt: item.created_at || '',
         }));
         res.status(200).json(saleItems);
@@ -787,7 +760,13 @@ const setupRoutes = (app) => {
       const result = await pool.query('SELECT * FROM amount_data LIMIT 1');
       const amountData = result.rows[0];
       if (amountData) {
-        const saleItems = await pool.query('SELECT * FROM sale_items WHERE amount_data_id = $1 ORDER BY button_label', [amountData.id]);
+        const saleItems = await pool.query(
+          `SELECT si.*, p.name as button_label, p.unit_price, p.unit_measure, p.tax_code 
+           FROM sale_items si 
+           LEFT JOIN products p ON si.product_code = p.product_code 
+           WHERE si.amount_data_id = $1 ORDER BY si.id`, 
+          [amountData.id]
+        );
         res.json({
           id: amountData.id,
           totalAmount: amountData.total_amount || '0',
@@ -823,7 +802,13 @@ const setupRoutes = (app) => {
 
   app.get('/amount-data/:id/sale-items', async (req, res) => {
     try {
-      const result = await pool.query('SELECT * FROM sale_items WHERE amount_data_id = $1 ORDER BY button_label', [req.params.id]);
+      const result = await pool.query(
+        `SELECT si.*, p.name as button_label, p.unit_price, p.unit_measure, p.tax_code 
+         FROM sale_items si 
+         LEFT JOIN products p ON si.product_code = p.product_code 
+         WHERE si.amount_data_id = $1 ORDER BY si.id`, 
+        [req.params.id]
+      );
       res.json(result.rows.map(transformSaleItem));
     } catch (error) {
       console.error('Error fetching saleItems:', error);
@@ -832,16 +817,18 @@ const setupRoutes = (app) => {
   });
 
   app.post('/amount-data/:id/sale-items', async (req, res) => {
-    const { itemId, buttonLabel, productCode, amount, quantity, taxCode, addProdCode, reverseSale, unitPrice, unitMeasure, saleChannel, rebateLabel, addProdInfo, isSelected } = req.body;
-    const item = { itemId, buttonLabel: buttonLabel || 'Item1', productCode, amount, quantity, taxCode, addProdCode, reverseSale, unitPrice, unitMeasure, saleChannel, rebateLabel, addProdInfo, isSelected };
-
-    const result = await insertWithErrorHandling(
-      'INSERT INTO sale_items (amount_data_id, item_id, button_label, product_code, amount, quantity, tax_code, add_prod_code, reverse_sale, unit_price, unit_measure, sale_channel, rebate_label, add_prod_info, is_selected, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP) ON CONFLICT (amount_data_id, button_label) DO UPDATE SET item_id = $2, product_code = $4, amount = $5, quantity = $6, tax_code = $7, add_prod_code = $8, reverse_sale = $9, unit_price = $10, unit_measure = $11, sale_channel = $12, rebate_label = $13, add_prod_info = $14, is_selected = $15, created_at = CURRENT_TIMESTAMP RETURNING *',
-      prepareSaleItemValues(item, req.params.id),
-      'Sale item updated successfully:'
-    );
-
-    res.json(result ? transformSaleItem(result.rows[0]) : { message: 'Failed to update sale item' });
+    const item = req.body;
+    try {
+      const result = await insertWithErrorHandling(
+        'INSERT INTO sale_items (amount_data_id, product_code, amount, quantity, add_prod_code, reverse_sale, sale_channel, rebate_label, add_prod_info, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP) ON CONFLICT (amount_data_id, product_code) DO UPDATE SET amount = $3, quantity = $4, add_prod_code = $5, reverse_sale = $6, sale_channel = $7, rebate_label = $8, add_prod_info = $9, created_at = CURRENT_TIMESTAMP RETURNING *',
+        prepareSaleItemValues(item, req.params.id),
+        'Sale item updated successfully:'
+      );
+      res.json(result ? transformSaleItem(result.rows[0]) : { message: 'Failed to update sale item' });
+    } catch (error) {
+      console.error('Error updating sale item:', error);
+      res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
   });
 
   app.post('/configuration', (req, res) => {
@@ -855,7 +842,7 @@ const setupRoutes = (app) => {
     });
 
     const newConfig = { clientIp, serverIp, epsPort, posProxyPort, opiMode };
-    updateTcpConfigData(newConfig); // Mettre à jour uniquement dans tcpHandler
+    updateTcpConfigData(newConfig); // Mettre à  jour uniquement dans tcpHandler
     restartTcpServer();
 
     res.status(200).json({
@@ -877,3 +864,4 @@ const setupRoutes = (app) => {
 };
 
 module.exports = setupRoutes;
+

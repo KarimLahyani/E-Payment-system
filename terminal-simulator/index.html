@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>IFSF Payment Terminal Simulator</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">POS-EPS style simulator</p>
+        <h1>Payment Terminal Simulator</h1>
+      </div>
+      <div class="status-pill" id="connectionStatus">Terminal idle</div>
+    </header>
+
+    <main class="layout">
+      <section class="panel app-panel" aria-labelledby="appTitle" style="display: none;">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Merchant app</p>
+            <h2 id="appTitle">Sale request</h2>
+          </div>
+          <button class="secondary" id="resetBtn" type="button">Reset</button>
+        </div>
+
+        <form id="saleForm" class="sale-form">
+          <label>
+            Amount
+            <input id="amountInput" type="number" min="0.01" step="0.01" value="72.50" required>
+          </label>
+          <label>
+            Currency
+            <select id="currencyInput">
+              <option>EUR</option>
+              <option>GBP</option>
+              <option>USD</option>
+              <option>NGN</option>
+            </select>
+          </label>
+          <label>
+            Transaction
+            <select id="transactionType">
+              <option value="Sale">Sale</option>
+              <option value="Refund">Refund</option>
+              <option value="PreAuthorisation">Pre-authorisation</option>
+              <option value="Completion">Completion</option>
+            </select>
+          </label>
+          <label>
+            Product
+            <select id="productInput">
+              <option value="102">Diesel - 102</option>
+              <option value="101">Premium Unleaded - 101</option>
+              <option value="201">Coffee - 201</option>
+              <option value="301">Car Wash (Basic) - 301</option>
+              <option value="202">Sandwich - 202</option>
+            </select>
+          </label>
+          <label>
+            Site ID
+            <input id="siteInput" value="SITE-0142" maxlength="20">
+          </label>
+          <label>
+            Pump / lane
+            <input id="pumpInput" value="PUMP-03" maxlength="20">
+          </label>
+          <label>
+            Driver / operator ID
+            <input id="driverInput" value="DRV-1008" maxlength="30">
+          </label>
+          <label>
+            Odometer
+            <input id="odometerInput" type="number" min="0" value="125890">
+          </label>
+
+          <button class="primary" type="submit">Start transaction</button>
+        </form>
+
+        <div class="result-box" id="resultBox">
+          Configure a sale, pick a business card, then start the terminal flow.
+        </div>
+      </section>
+
+      <section class="panel cards-panel" aria-labelledby="cardsTitle">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Business cards</p>
+            <h2 id="cardsTitle">Profiles</h2>
+          </div>
+          <button class="secondary" id="loadDefaultsBtn" type="button">Defaults</button>
+        </div>
+        <div id="cardList" class="card-list"></div>
+
+        <details class="new-card">
+          <summary>Add business card profile</summary>
+          <form id="cardForm" class="card-form">
+            <label>
+              Card name
+              <input id="newCardName" placeholder="North Depot Fuel Card" required>
+            </label>
+            <label>
+              Business
+              <input id="newCardBusiness" placeholder="Example Logistics Ltd" required>
+            </label>
+            <label>
+              BIN
+              <input id="newCardBin" inputmode="numeric" maxlength="8" placeholder="700001" required>
+            </label>
+            <label>
+              Last 4
+              <input id="newCardLast4" inputmode="numeric" maxlength="4" placeholder="1234" required>
+            </label>
+            <label>
+              Auth code / PIN
+              <input id="newCardCode" inputmode="numeric" maxlength="8" placeholder="4321" required>
+            </label>
+            <label>
+              Credit
+              <input id="newCardLimit" type="number" min="1" step="1" value="250">
+            </label>
+            <label>
+              Allowed products
+              <select id="newCardProducts" multiple size="5">
+                <option value="102" selected>Diesel - 102</option>
+                <option value="101">Premium Unleaded - 101</option>
+                <option value="201">Coffee - 201</option>
+                <option value="301">Car Wash (Basic) - 301</option>
+                <option value="202">Sandwich - 202</option>
+              </select>
+            </label>
+            <button class="secondary" type="submit">Add profile</button>
+          </form>
+        </details>
+      </section>
+
+      <section class="terminal-wrap" aria-labelledby="terminalTitle">
+        <div class="terminal-shell">
+          <div class="terminal-head">
+            <div>
+              <p class="eyebrow">EPT</p>
+              <h2 id="terminalTitle">Terminal</h2>
+            </div>
+            <span class="led" id="terminalLed" aria-hidden="true"></span>
+          </div>
+
+          <div class="terminal-screen" id="terminalScreen">
+            <span class="screen-line">WELCOME</span>
+            <span class="screen-line dim">Ready for transaction</span>
+          </div>
+
+          <div class="slot-area">
+            <button id="insertCardBtn" class="slot" type="button" disabled>
+              Insert selected card
+            </button>
+            <button id="removeCardBtn" class="secondary small" type="button" disabled>Remove</button>
+          </div>
+
+          <div class="pin-output" id="pinOutput" aria-live="polite">Code: ----</div>
+          <div class="pinpad" id="pinpad" aria-label="Terminal code pad">
+            <button type="button">1</button>
+            <button type="button">2</button>
+            <button type="button">3</button>
+            <button type="button">4</button>
+            <button type="button">5</button>
+            <button type="button">6</button>
+            <button type="button">7</button>
+            <button type="button">8</button>
+            <button type="button">9</button>
+            <button class="danger" type="button" data-action="clear">CLR</button>
+            <button type="button">0</button>
+            <button class="ok" type="button" data-action="enter">OK</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel comms-panel" aria-labelledby="commsTitle">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">App <-> terminal</p>
+            <h2 id="commsTitle">IFSF-style communication</h2>
+          </div>
+          <div class="button-row">
+            <button class="secondary" id="copyDbBtn" type="button">Copy DB</button>
+            <button class="secondary" id="copyLogBtn" type="button">Copy</button>
+            <button class="secondary" id="clearLogBtn" type="button">Clear</button>
+          </div>
+        </div>
+
+        <div class="channel-summary">
+          <span>Channel 0: card/service</span>
+          <span>Channel 1: device prompts</span>
+        </div>
+        <details class="db-preview" open>
+          <summary>Database write preview</summary>
+          <pre id="dbPreview">Start a transaction to see SQL mapped to your app schema.</pre>
+        </details>
+        <div class="message-log" id="messageLog" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <template id="messageTemplate">
+      <article class="message">
+        <header>
+          <span class="badge"></span>
+          <span class="message-meta"></span>
+        </header>
+        <pre></pre>
+      </article>
+    </template>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="src/app.js"></script>
+  </body>
+</html>
+

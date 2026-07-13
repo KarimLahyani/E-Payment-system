@@ -3,9 +3,8 @@ export interface RequestInfo {
     refNumber: string;
     appSender: string;
     popId: string;
-    workId: string;
+    workstationId: string;
     requestId: string;
-    autoIncrement: boolean;
     stan: string; // Nouveau champ ajouté
   }
   

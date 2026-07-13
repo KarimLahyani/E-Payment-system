@@ -277,7 +277,8 @@ const processCardServiceResponse = async (responseXML) => {
     const terminalBatch = cardServiceResponse.Terminal?.['$']?.TerminalBatch || cardServiceResponse.Terminal?.TerminalBatch || '000001';
 
     // Extraire le totalAmount
-    let totalAmount = cardServiceResponse.Tender?.TotalAmount?._ || '0';
+    let rawTotalAmount = cardServiceResponse.Tender?.TotalAmount;
+    let totalAmount = rawTotalAmount?._ || (typeof rawTotalAmount === 'string' ? rawTotalAmount : '0');
     if (typeof totalAmount === 'string') {
       totalAmount = totalAmount.trim();
     } else {

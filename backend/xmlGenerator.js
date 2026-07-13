@@ -1,6 +1,6 @@
 const { generateLengthHeader } = require('./utils');
 const { pool } = require('./database');
-const { configData } = require('./tcphandler');
+const { configData } = require('./tcpHandler');
 const os = require('os'); // Importer le module os pour getLocalIPAddress
 
 // Fonction pour obtenir l'adresse IP locale de la carte réseau
@@ -27,7 +27,7 @@ const generateServiceRequest = async (requestData, posData, amountData, loyaltyD
   const requestType = String(requestData.requestType || 'Unknown').trim();
   const requestId = String(requestData.requestId || '0').trim();
   const popId = String(requestData.popId || '01').trim();
-  const workstationId = 'POS01';
+  const workstationId = String(requestData.workstationId || 'POS01').trim();
   const applicationSender = String(requestData.appSender || 'AP4900').trim();
 
   const formatTimestamp = (timestamp) => {
@@ -220,10 +220,10 @@ const generateServiceRequest = async (requestData, posData, amountData, loyaltyD
     const selectedItems = amountData.saleItems.filter(item => item.isSelected === true || item.isSelected === 'true');
 
     if (selectedItems.length > 0) {
-      saleItemsSection = selectedItems.map(item => {
-        const itemId = String(item.itemId || '').trim();
+      saleItemsSection = selectedItems.map((item, index) => {
+        const itemId = String(index + 1); // IFSF requires a 1-based sequential ItemID
         const productCode = String(item.productCode || '').trim();
-        const amount = formatNumberWithLeadingZeros(item.amount || '0.00', 7, 2);
+        const itemAmount = formatNumberWithLeadingZeros(item.itemAmount || '0.00', 7, 2);
         const unitMeasure = String(item.unitMeasure || '').trim();
         const unitPrice = formatNumberWithLeadingZeros(item.unitPrice || '0.00', 4, 3);
         const quantity = formatNumberWithLeadingZeros(item.quantity || '0.00', 5, 2);
@@ -233,9 +233,11 @@ const generateServiceRequest = async (requestData, posData, amountData, loyaltyD
         const reverseSale = String(item.reverseSale || 'false').trim();
         const saleChannel = String(item.saleChannel || '').trim();
 
+        const productName = String(item.productName || '').trim();
+        
         const saleItemLine1 = `    <SaleItem ItemID="${itemId}"${reverseSale === 'true' ? ` ReverseSale="${reverseSale}"` : ''}>`;
         const saleItemLine2 = `        <ProductCode>${productCode}</ProductCode>`;
-        const saleItemLine3 = `        <Amount>${amount}</Amount>`;
+        const saleItemLine3 = `        <ItemAmount>${itemAmount}</ItemAmount>`;
         const saleItemLine4 = unitMeasure ? `        <UnitMeasure>${unitMeasure}</UnitMeasure>` : '';
         const saleItemLine5 = unitPrice ? `        <UnitPrice>${unitPrice}</UnitPrice>` : '';
         const saleItemLine6 = quantity ? `        <Quantity>${quantity}</Quantity>` : '';
@@ -243,9 +245,10 @@ const generateServiceRequest = async (requestData, posData, amountData, loyaltyD
         const saleItemLine8 = additionalProductCode ? `        <AdditionalProductCode>${additionalProductCode}</AdditionalProductCode>` : '';
         const saleItemLine9 = additionalProductInfo ? `        <AdditionalProductInfo>${additionalProductInfo}</AdditionalProductInfo>` : '';
         const saleItemLine10 = saleChannel ? `        <SaleChannel>${saleChannel}</SaleChannel>` : '';
-        const saleItemLine11 = `    </SaleItem>`;
+        const saleItemLine11 = productName ? `        <ProductName>${productName}</ProductName>` : '';
+        const saleItemLine12 = `    </SaleItem>`;
 
-        return [saleItemLine1, saleItemLine2, saleItemLine3, saleItemLine4, saleItemLine5, saleItemLine6, saleItemLine7, saleItemLine8, saleItemLine9, saleItemLine10, saleItemLine11]
+        return [saleItemLine1, saleItemLine2, saleItemLine3, saleItemLine4, saleItemLine5, saleItemLine6, saleItemLine7, saleItemLine8, saleItemLine9, saleItemLine10, saleItemLine11, saleItemLine12]
           .filter(line => line)
           .join('\n');
       }).join('\n');

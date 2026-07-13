@@ -69,10 +69,9 @@ const DEFAULT_AMOUNT_DATA: AmountData = {
   currency: 'EUR',
   saleItems: [],
   itemDetails: {
-    itemId: '',
-    buttonLabel: '',
+    productName: '',
     productCode: '',
-    amount: '',
+    itemAmount: '',
     quantity: '',
     taxCode: '',
     addProdCode: '',
@@ -135,6 +134,12 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
   serviceRequestMessage: string = '';
 
   responseInfo: ResponseInfo | null = null;
+  isLoading: boolean = false;
+  pollingInterval: any;
+  private activeResponseRequestId: string | null = null;
+  responseRequestId: string | null = null;
+  currentRequestId: string = '1';
+  private lastShownDialogMessage: string = '';
 
   configData: ConfigurationData = {
     clientIp: '127.0.0.1',
@@ -155,7 +160,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     private dialog: MatDialog,
     private configurationService: ConfigurationService,
     private http: HttpClient
-  ) {}
+  ) { }
 
   ngOnInit() {
     this.loadLastRequestInfo();
@@ -171,6 +176,9 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.subscription?.unsubscribe();
     this.deviceSubscription?.unsubscribe();
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+    }
   }
 
   private subscribeToDeviceMessages() {
@@ -178,24 +186,19 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
       (messages: DeviceData) => {
         console.log('Nouveau message reçu dans subscribeToDeviceMessages:', messages);
         if (messages.display && messages.display !== 'No message content') {
-          if (this.deviceData.display) {
-            this.deviceData.display += '\n' + messages.display;
-          } else {
-            this.deviceData.display = messages.display;
-          }
+          this.deviceData.display = messages.display;
         }
         if (messages.printer && messages.printer !== 'No message content') {
           this.deviceData.printer = messages.printer;
         }
         if (messages.cashierTerminal && messages.cashierTerminal !== 'No message content') {
           console.log('Message CashierTerminal détecté:', messages.cashierTerminal);
-          if (this.deviceData.cashierTerminal) {
-            this.deviceData.cashierTerminal += '\n' + messages.cashierTerminal;
-          } else {
-            this.deviceData.cashierTerminal = messages.cashierTerminal;
+          this.deviceData.cashierTerminal = messages.cashierTerminal;
+          // Afficher la pop-up Angular Material pour demander une confirmation uniquement si c'est un nouveau message
+          if (messages.cashierTerminal !== this.lastShownDialogMessage) {
+            this.lastShownDialogMessage = messages.cashierTerminal;
+            this.showConfirmationDialog(messages.cashierTerminal);
           }
-          // Afficher la pop-up Angular Material pour demander une confirmation
-          this.showConfirmationDialog(messages.cashierTerminal);
         }
         this.cdr.detectChanges();
       },
@@ -227,24 +230,33 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
   }
 
   private initializeSaleItems() {
-    this.amountData.saleItems = Array.from({ length: 35 }, (_, i) => ({
-      itemId: `Item${i + 1}`,
-      buttonLabel: `Item${i + 1}`,
-      productCode: '',
-      amount: '',
-      quantity: '',
-      taxCode: '',
-      addProdCode: '',
-      reverseSale: '',
-      unitPrice: '',
-      unitMeasure: '',
-      saleChannel: '',
-      rebateLabel: '',
-      addProdInfo: '',
-      isSelected: false,
-      createdAt: ''
-    }));
-    this.requestInfoService.updateData({ amountData: this.amountData });
+    this.requestInfoService.getProducts().subscribe(
+      (products) => {
+        this.amountData.saleItems = products.map(product => ({
+          productName: product.productName,
+          productCode: product.productCode,
+          itemAmount: '',
+          quantity: '',
+          taxCode: product.taxCode,
+          addProdCode: '',
+          reverseSale: '',
+          unitPrice: product.unitPrice,
+          unitMeasure: product.unitMeasure,
+          saleChannel: '',
+          rebateLabel: '',
+          addProdInfo: '',
+          isSelected: false,
+          createdAt: ''
+        }));
+        this.requestInfoService.updateData({ amountData: this.amountData });
+        console.log('Successfully initialized sale items from products catalog', this.amountData.saleItems);
+      },
+      (error) => {
+        console.error('Failed to initialize sale items, falling back to empty list', error);
+        this.amountData.saleItems = [];
+        this.requestInfoService.updateData({ amountData: this.amountData });
+      }
+    );
   }
 
   loadConfiguration() {
@@ -286,6 +298,8 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
         }
         this.requestInfoService.updateData({ requestData: this.requestData, configData: this.configData });
         console.log('Last request info loaded:', this.requestData);
+        this.checkPendingRequest();
+        this.loadCurrentRequestId();
       },
       (error) => {
         console.error('Error loading last request info:', error);
@@ -298,14 +312,47 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     this.requestInfoService.getLastResponseInfo().subscribe(
       (data) => {
         this.responseInfo = data;
+        this.responseRequestId = data?.cardServiceResponse?.attributes?.requestId?.toString() || null;
         console.log('Last response info loaded:', this.responseInfo);
         this.cdr.detectChanges();
+        this.checkPendingRequest();
       },
       (error) => {
         console.error('Error loading last response info:', error);
         this.responseInfo = null;
+        this.responseRequestId = null;
         this.cdr.detectChanges();
+        this.checkPendingRequest();
       }
+    );
+  }
+
+  checkPendingRequest() {
+    if (this.isLoading || !this.responseRequestId) return;
+
+    const expectedId = parseInt(this.responseRequestId, 10);
+    const responseId = parseInt(this.responseInfo?.cardServiceResponse?.attributes?.requestId || '', 10);
+
+    if (!isNaN(expectedId) && (isNaN(responseId) || expectedId > responseId)) {
+      console.log(`Response ${this.responseRequestId} is not loaded yet. Resuming polling...`);
+      this.startPollingForResponse(this.responseRequestId);
+    }
+  }
+
+  loadCurrentRequestId() {
+    if (this.isLoading) {
+      return;
+    }
+
+    this.requestInfoService.getNextRequestId().subscribe(
+      (response) => {
+        if (response?.requestId) {
+          this.currentRequestId = response.requestId.toString();
+          this.requestData.requestId = this.currentRequestId;
+          this.cdr.detectChanges();
+        }
+      },
+      (error) => console.error('Error loading next request id:', error)
     );
   }
 
@@ -332,6 +379,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     this.loyaltyData.bonusCard = false;
     console.log('bonusCard réinitialisé à false avant envoi via Send:', this.loyaltyData.bonusCard);
     this.requestInfoService.updateData({ loyaltyData: this.loyaltyData });
+    this.prepareForNewResponse();
 
     const fullRequestData: FullRequestData = {
       requestData: this.requestData,
@@ -348,18 +396,26 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
         this.serviceRequestMessage = response.serviceRequest || 'No Service Request available';
 
         if (response.requestId) {
-          this.requestData.requestId = response.requestId.toString();
+          const sentRequestId = response.requestId.toString();
+          this.requestData.requestId = sentRequestId;
+          this.currentRequestId = sentRequestId;
+          this.responseRequestId = sentRequestId;
           this.requestInfoService.updateData({ requestData: this.requestData });
           console.log('Updated requestData.requestId to:', this.requestData.requestId);
+          this.startPollingForResponse(sentRequestId);
+        } else {
+          this.isLoading = false;
+          this.activeResponseRequestId = null;
+          alert("Données envoyées avec succès, mais aucun ID de requête retourné.");
         }
-
-        alert("Données envoyées avec succès !");
         this.cdr.detectChanges();
       },
       (error: any) => {
         console.error("Erreur lors de l'envoi :", error);
         this.serviceRequestMessage = 'Erreur lors de l\'envoi des données';
 
+        this.isLoading = false;
+        this.activeResponseRequestId = null;
         alert("Échec de l'envoi des données.");
         this.cdr.detectChanges();
       }
@@ -393,6 +449,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
       );
     } else {
       this.requestData.stan = '';
+      this.requestInfoService.updateData({ requestData: this.requestData });
     }
   }
 
@@ -407,6 +464,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     this.deviceData.display = '';
     this.deviceData.printer = '';
     this.deviceData.cashierTerminal = '';
+    this.lastShownDialogMessage = '';
     console.log("Clear button clicked, all fields cleared");
 
     alert("Champs effacés avec succès !");
@@ -434,6 +492,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     if (this.isBonusButtonEnabled()) {
       this.loyaltyData.bonusCard = true;
       console.log('bonusCard défini à true pour Bonus:', this.loyaltyData.bonusCard);
+      this.prepareForNewResponse();
       this.requestInfoService.updateData({
         loyaltyData: this.loyaltyData,
         requestData: this.requestData
@@ -453,19 +512,27 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
           this.serviceRequestMessage = response.serviceRequest || 'No Service Request available';
 
           if (response.requestId) {
-            this.requestData.requestId = response.requestId.toString();
+            const sentRequestId = response.requestId.toString();
+            this.requestData.requestId = sentRequestId;
+            this.currentRequestId = sentRequestId;
+            this.responseRequestId = sentRequestId;
             this.requestInfoService.updateData({ requestData: this.requestData });
             console.log('Updated requestData.requestId to:', this.requestData.requestId);
             this.requestInfoService.updateData({ refreshRequestId: response.requestId });
+            this.startPollingForResponse(sentRequestId);
+          } else {
+            this.isLoading = false;
+            this.activeResponseRequestId = null;
+            alert("Données avec Bonus Card envoyées avec succès !");
           }
-
-          alert("Données avec Bonus Card envoyées avec succès !");
           this.cdr.detectChanges();
         },
         (error: any) => {
           console.error("Erreur lors de l'envoi (Bonus) :", error);
           this.serviceRequestMessage = 'Erreur lors de l\'envoi des données avec Bonus Card';
 
+          this.isLoading = false;
+          this.activeResponseRequestId = null;
           alert("Échec de l'envoi des données avec Bonus Card.");
           this.cdr.detectChanges();
         }
@@ -482,7 +549,9 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
         if (data === true) {
           console.log('Mise à jour globale détectée, rafraîchissement de RequestInfoComponent');
           this.loadLastRequestInfo();
-          this.loadLastResponseInfo();
+          if (!this.isLoading) {
+            this.loadLastResponseInfo();
+          }
           this.requestInfoService.fetchDeviceMessages();
           this.cdr.detectChanges();
         } else if (typeof data === 'object' && data !== null) {
@@ -518,15 +587,28 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     );
   }
 
+  private prepareForNewResponse() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
+    this.activeResponseRequestId = null;
+    this.responseInfo = null;
+    this.isLoading = true;
+    this.deviceData.display = '';
+    this.deviceData.printer = '';
+    this.deviceData.cashierTerminal = '';
+    this.cdr.detectChanges();
+  }
+
   private resetToInitialState() {
     this.requestData = {
       requestType: '',
       refNumber: '',
-      appSender: '',
-      popId: '',
-      workId: '',
+      appSender: 'AP4900',
+      popId: '01',
+      workstationId: 'POS01',
       requestId: '',
-      autoIncrement: false,
       stan: '',
     };
     this.posData = {
@@ -553,27 +635,11 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
       totalAmount: '',
       preAuthAmount: '',
       currency: 'EUR',
-      saleItems: Array.from({ length: 35 }, (_, i) => ({
-        itemId: '',
-        buttonLabel: `Item${i + 1}`,
-        productCode: '',
-        amount: '',
-        quantity: '',
-        taxCode: '',
-        addProdCode: '',
-        reverseSale: '',
-        unitPrice: '',
-        unitMeasure: '',
-        saleChannel: '',
-        rebateLabel: '',
-        addProdInfo: '',
-        isSelected: false
-      })),
+      saleItems: [],
       itemDetails: {
-        itemId: '',
-        buttonLabel: '',
+        productName: '',
         productCode: '',
-        amount: '',
+        itemAmount: '',
         quantity: '',
         taxCode: '',
         addProdCode: '',
@@ -611,13 +677,114 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     this.dataRequest = {
       menuAction: ''
     };
-    this.serviceRequestMessage = '';
-    this.requestInfoService.updateData({
-      requestData: this.requestData,
-      posData: this.posData,
-      amountData: this.amountData,
-      loyaltyData: this.loyaltyData,
-      configData: this.configData
-    });
+    this.activeResponseRequestId = null;
+    this.responseRequestId = null;
+    this.currentRequestId = '';
+    this.responseInfo = null;
+    this.isLoading = false;
+    this.loadCurrentRequestId();
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
+    this.requestInfoService.updateData({ amountData: this.amountData, loyaltyData: this.loyaltyData, posData: this.posData });
+    this.initializeSaleItems();
+  }
+
+  isAmountSectionVisible(): boolean {
+    const amountDataRequiredTypes = [
+      'CardPayment', 'CardPreAuthorisation', 'PreAuth+Fin.Advice',
+      'CardPaymentLoyaltyRedemption', 'LoyaltyAward'
+    ];
+    return amountDataRequiredTypes.includes(this.requestData.requestType);
+  }
+
+  isLoyaltySectionVisible(): boolean {
+    const loyaltyDataRequiredTypes = [
+      'LoyaltyAward', 'LoyaltyAwardRefund', 'LoyaltyRedemption',
+      'LoyaltyRedemptionRefund', 'LoyaltyBalanceQuery', 'LoyaltyLinkCard',
+      'CardPaymentLoyaltyRedemption'
+    ];
+    return loyaltyDataRequiredTypes.includes(this.requestData.requestType);
+  }
+
+  startPollingForResponse(requestId: string) {
+    this.isLoading = true;
+    this.activeResponseRequestId = requestId;
+    this.responseRequestId = requestId;
+    this.responseInfo = null;
+    this.deviceData.display = '';
+    this.deviceData.printer = '';
+    this.deviceData.cashierTerminal = '';
+
+    // Check immediately, then every second for up to 30 seconds.
+    const maxWaitTime = 30000;
+    const startTime = Date.now();
+
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+    }
+
+    const finishPolling = (data: ResponseInfo) => {
+      this.responseInfo = data;
+      console.log(`Response info loaded for ID ${requestId}:`, this.responseInfo);
+
+      if (this.pollingInterval) {
+        clearInterval(this.pollingInterval);
+        this.pollingInterval = null;
+      }
+
+      // Fetch device messages one final time to ensure we catch any delayed Printer/Display messages
+      // that arrived exactly as the transaction completed.
+      setTimeout(() => {
+        this.requestInfoService.fetchDeviceMessages();
+      }, 1000);
+
+      this.isLoading = false;
+      this.activeResponseRequestId = null;
+      
+      // FIX FOR ID: update the form's Request ID to the NEXT ID immediately after response finishes
+      const nextId = (Number(requestId) + 1).toString();
+      this.currentRequestId = nextId;
+      this.requestData = { ...this.requestData, requestId: nextId };
+      this.requestInfoService.updateData({ requestData: this.requestData });
+      
+      this.cdr.detectChanges();
+      console.log("Response fully received!");
+    };
+
+    const pollForResponse = () => {
+      this.requestInfoService.getResponseInfoById(requestId).subscribe(
+        (data) => {
+          const responseRequestId = data?.cardServiceResponse?.attributes?.requestId?.toString();
+          if (this.activeResponseRequestId !== requestId || responseRequestId !== requestId?.toString()) {
+            console.warn(`Ignoring stale response. Expected ${requestId}, received ${responseRequestId || 'empty'}.`);
+            return;
+          }
+
+          finishPolling(data);
+        },
+        () => {
+          // If 404, it means it's not ready yet, keep polling.
+          console.log(`Still waiting for response ID ${requestId}...`);
+        }
+      );
+
+      this.requestInfoService.fetchDeviceMessages();
+
+      if (Date.now() - startTime > maxWaitTime) {
+        if (this.pollingInterval) {
+          clearInterval(this.pollingInterval);
+          this.pollingInterval = null;
+        }
+        this.isLoading = false;
+        this.activeResponseRequestId = null;
+        this.cdr.detectChanges();
+        alert("Timeout en attendant la réponse de l'EPS (30s).");
+      }
+    };
+
+    this.pollingInterval = setInterval(pollForResponse, 1000);
+    pollForResponse();
   }
 }

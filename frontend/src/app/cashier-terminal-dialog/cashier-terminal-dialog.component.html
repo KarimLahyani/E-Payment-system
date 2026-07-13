@@ -1,1 +1,55 @@
-<p>cashier-terminal-dialog works!</p>
+﻿<div class="terminal-dialog">
+  <section class="terminal-shell">
+    <div class="terminal-top">
+      <div>
+        <div class="eyebrow">EPT Simulator</div>
+        <h2>{{ title }}</h2>
+      </div>
+      <span class="led" [class.ready]="canSubmit" [class.waiting]="!canSubmit"></span>
+    </div>
+
+    <div class="screen" aria-live="polite">
+      <div class="screen-main">{{ lines[0] || 'READY' }}</div>
+      <div class="screen-sub" *ngFor="let line of lines.slice(1)">{{ line }}</div>
+    </div>
+
+    <div class="card-area">
+      <div class="business-card" [class.inserted]="cardInserted">
+        <div class="chip"></div>
+        <div>
+          <strong>{{ selectedCard.label }}</strong>
+          <span>{{ selectedCard.business }}</span>
+          <span>{{ selectedCard.maskedPan }}</span>
+        </div>
+        <small>{{ selectedCard.status }} - {{ selectedCard.products }}</small>
+      </div>
+      <div class="slot-actions" *ngIf="mode === 'insert'">
+        <button type="button" class="slot-button" (click)="insertCard()">Insert selected card</button>
+        <button type="button" class="ghost" (click)="removeCard()">Remove</button>
+      </div>
+    </div>
+
+    <div class="pin-section" *ngIf="mode === 'code'">
+      <div class="pin-output">Code: {{ codeBuffer ? '*'.repeat(codeBuffer.length) : '----' }}</div>
+      <div class="pinpad">
+        <button type="button" (click)="pressKey('1')">1</button>
+        <button type="button" (click)="pressKey('2')">2</button>
+        <button type="button" (click)="pressKey('3')">3</button>
+        <button type="button" (click)="pressKey('4')">4</button>
+        <button type="button" (click)="pressKey('5')">5</button>
+        <button type="button" (click)="pressKey('6')">6</button>
+        <button type="button" (click)="pressKey('7')">7</button>
+        <button type="button" (click)="pressKey('8')">8</button>
+        <button type="button" (click)="pressKey('9')">9</button>
+        <button type="button" class="danger" (click)="clearCode()">CLR</button>
+        <button type="button" (click)="pressKey('0')">0</button>
+        <button type="button" class="ok" [disabled]="!canSubmit" (click)="submit()">OK</button>
+      </div>
+    </div>
+
+    <div class="terminal-actions">
+      <button type="button" class="secondary" (click)="decline()">NO / Cancel</button>
+      <button type="button" class="primary" [disabled]="!canSubmit" (click)="submit()">{{ primaryActionLabel }}</button>
+    </div>
+  </section>
+</div>

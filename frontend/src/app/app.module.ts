@@ -14,7 +14,7 @@ import { HttpClientModule } from '@angular/common/http';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { MatDialogModule } from '@angular/material/dialog'; // Ajout pour la popup
 import { MatButtonModule } from '@angular/material/button';
-import { CashierTerminalDialogComponent } from './cashier-terminal-dialog/cashier-terminal-dialog.component'; // Ajout pour les boutons Material
+import { CashierTerminalDialogComponent } from './cashier-terminal-dialog/cashier-terminal-dialog.component';
 
 @NgModule({
   declarations: [

@@ -4,9 +4,8 @@ export const defaultInitialData = {
     refNumber: '',
     appSender: '',
     popId: '',
-    workId: '',
-    requestId: '',
-    autoIncrement: false
+    workstationId: '',
+    requestId: ''
   },
   posData: {
     posTimestamp: '',
@@ -34,7 +33,7 @@ export const defaultInitialData = {
     currency: 'EUR',
     saleItems: [],
     itemDetails: {
-      itemId: '',
+      productName: '',
       productCode: '',
       amount: '',
       quantity: '',
@@ -80,9 +79,8 @@ export interface InitialData {
     refNumber: string;
     appSender: string;
     popId: string;
-    workId: string;
+    workstationId: string;
     requestId: string;
-    autoIncrement: boolean;
     stan: string; // Nouveau champ ajouté
   };
   posData: {

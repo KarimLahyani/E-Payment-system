@@ -8,10 +8,9 @@ import { SaleItem } from '../models/full-request-data.model';
 })
 export class SaleItemComponent {
   @Input() saleItem: SaleItem = {
-    itemId: '',
-    buttonLabel: '',
+    productName: '',
     productCode: '',
-    amount: '',
+    itemAmount: '',
     quantity: '',
     taxCode: '',
     addProdCode: '',
@@ -44,18 +43,15 @@ export class SaleItemComponent {
 
     // Mettre à jour la propriété correspondante dans saleItem
     switch (field) {
-      case 'itemId':
-        this.saleItem.itemId = validatedValue;
-        break;
-      case 'buttonLabel':
-        this.saleItem.buttonLabel = validatedValue;
+      case 'productName':
+        this.saleItem.productName = validatedValue;
         break;
       case 'productCode':
         this.saleItem.productCode = validatedValue;
         break;
       case 'quantity':
         this.saleItem.quantity = validatedValue;
-        this.calculateAmount(); // Recalculer amount
+        this.calculateAmount(); // Recalculer itemAmount
         break;
       case 'taxCode':
         this.saleItem.taxCode = validatedValue;
@@ -68,7 +64,7 @@ export class SaleItemComponent {
         break;
       case 'unitPrice':
         this.saleItem.unitPrice = validatedValue;
-        this.calculateAmount(); // Recalculer amount
+        this.calculateAmount(); // Recalculer itemAmount
         break;
       case 'unitMeasure':
         this.saleItem.unitMeasure = validatedValue;
@@ -89,18 +85,25 @@ export class SaleItemComponent {
     this.saleItemChange.emit({ ...this.saleItem });
   }
 
-  onSelectItemChange(event: Event) {
-    const target = event.target as HTMLInputElement;
-    this.saleItem.isSelected = target.checked;
-    console.log('Checkbox changed for item:', this.saleItem.buttonLabel, 'isSelected:', this.saleItem.isSelected);
-    this.saleItemChange.emit({ ...this.saleItem });
+  increaseQuantity() {
+    let currentQty = parseInt(this.saleItem.quantity, 10) || 0;
+    this.saleItem.quantity = (currentQty + 1).toString();
+    this.onFieldChange('quantity', this.saleItem.quantity);
+  }
+
+  decreaseQuantity() {
+    let currentQty = parseInt(this.saleItem.quantity, 10) || 0;
+    if (currentQty > 0) {
+      this.saleItem.quantity = (currentQty - 1).toString();
+      this.onFieldChange('quantity', this.saleItem.quantity);
+    }
   }
 
   private calculateAmount() {
     const quantity = parseFloat(this.saleItem.quantity) || 0;
     const unitPrice = parseFloat(this.saleItem.unitPrice) || 0;
     const amount = quantity * unitPrice;
-    this.saleItem.amount = amount.toFixed(2); // Arrondir à 2 décimales
-    console.log(`Calculated amount for ${this.saleItem.buttonLabel}: quantity=${quantity}, unitPrice=${unitPrice}, amount=${this.saleItem.amount}`);
+    this.saleItem.itemAmount = amount.toFixed(2); // Arrondir à 2 décimales
+    console.log(`Calculated amount for ${this.saleItem.productName}: quantity=${quantity}, unitPrice=${unitPrice}, itemAmount=${this.saleItem.itemAmount}`);
   }
 }
