@@ -259,17 +259,19 @@ let client = new net.Socket();
 
 // Fonction pour traiter CardServiceResponse et insérer dans response_info
 const processCardServiceResponse = async (responseXML) => {
+  let requestId = '0';
   try {
     console.log('Starting processCardServiceResponse with responseXML:', responseXML);
     const parser = new xml2js.Parser({ explicitArray: false, trim: true });
     const result = await parser.parseStringPromise(responseXML);
 
-    const cardServiceResponse = result.CardServiceResponse;
+    const cardServiceResponse = result.CardServiceResponse || result.EPSMessage?.CardServiceResponse || result.POSMessage?.CardServiceResponse;
+    if (!cardServiceResponse) throw new Error('CardServiceResponse not found in XML');
     console.log('Full cardServiceResponse object:', JSON.stringify(cardServiceResponse, null, 2));
 
-    const overallResult = cardServiceResponse['$'].OverallResult || 'Unknown';
-    const requestType = cardServiceResponse['$'].RequestType || 'Unknown';
-    const requestId = cardServiceResponse['$'].RequestID || '0';
+    const overallResult = cardServiceResponse['$']?.OverallResult || 'Unknown';
+    const requestType = cardServiceResponse['$']?.RequestType || 'Unknown';
+    requestId = cardServiceResponse['$']?.RequestID || '0';
     const stan = cardServiceResponse.Terminal?.['$'].STAN || null;
     const terminalId = cardServiceResponse.Terminal?.['$'].TerminalID || null;
     const terminalBatch = cardServiceResponse.Terminal?.['$'].TerminalBatch || null;
