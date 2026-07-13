@@ -64,7 +64,7 @@ const server = net.createServer((socket) => {
 
     if (message.trim().startsWith('<?xml') || message.trim().startsWith('<')) {
       try {
-        const parser = new xml2js.Parser({ explicitArray: false, trim: true });
+        const parser = new xml2js.Parser({ explicitArray: false, trim: false });
         const parsedMessage = await parser.parseStringPromise(message);
 
         if (parsedMessage.DeviceRequest) {
@@ -262,7 +262,7 @@ const processCardServiceResponse = async (responseXML) => {
   let requestId = '0';
   try {
     console.log('Starting processCardServiceResponse with responseXML:', responseXML);
-    const parser = new xml2js.Parser({ explicitArray: false, trim: true });
+    const parser = new xml2js.Parser({ explicitArray: false, trim: false });
     const result = await parser.parseStringPromise(responseXML);
 
     const cardServiceResponse = result.CardServiceResponse || result.EPSMessage?.CardServiceResponse || result.POSMessage?.CardServiceResponse;
@@ -276,13 +276,16 @@ const processCardServiceResponse = async (responseXML) => {
     const terminalId = cardServiceResponse.Terminal?.['$']?.TerminalID || cardServiceResponse.Terminal?.TerminalID || null;
     const terminalBatch = cardServiceResponse.Terminal?.['$']?.TerminalBatch || cardServiceResponse.Terminal?.TerminalBatch || '000001';
 
-    // Extraire le totalAmount
     let rawTotalAmount = cardServiceResponse.Tender?.TotalAmount;
     let totalAmount = rawTotalAmount?._ || (typeof rawTotalAmount === 'string' ? rawTotalAmount : '0');
     if (typeof totalAmount === 'string') {
       totalAmount = totalAmount.trim();
     } else {
       totalAmount = totalAmount.toString().trim();
+    }
+    const tenderCurrency = rawTotalAmount?.['$']?.Currency || 'EUR';
+    if (totalAmount !== '0') {
+      totalAmount = `${totalAmount} ${tenderCurrency}`;
     }
     console.log(`Extracted totalAmount: ${totalAmount}, Raw TotalAmount object: ${JSON.stringify(cardServiceResponse.Tender?.TotalAmount)}`);
 
@@ -543,7 +546,7 @@ const setSocketIo = (socketIo) => {
 
       if (xmlMessage.trim().startsWith('<?xml') || xmlMessage.trim().startsWith('<')) {
         try {
-          const parser = new xml2js.Parser({ explicitArray: false, trim: true });
+          const parser = new xml2js.Parser({ explicitArray: false, trim: false });
           const parsedMessage = await parser.parseStringPromise(xmlMessage);
           
           await handleDeviceRequest(parsedMessage, (resp) => {
