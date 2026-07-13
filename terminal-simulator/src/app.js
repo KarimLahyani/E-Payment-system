@@ -673,15 +673,19 @@ ${indent}</${name}>`;
         return " ".repeat(leftPadding) + str;
       };
 
-      const lines = [
-        center("IFSF STATION"),
-        center("789 HIGHWAY ROUTE 66"),
-        center(`STATION #${transaction.siteId}`),
-        divider,
-        center(dateStr),
-        `PUMP: ${transaction.pumpId.padEnd(10)} TRANS: ${stanStr}`,
-        divider
-      ];
+        const leftPart = `PUMP: ${transaction.pumpId}`;
+        const rightPart = `TRANS: ${stanStr}`;
+        const spaces = 40 - leftPart.length - rightPart.length;
+        
+        const lines = [
+          center("IFSF STATION"),
+          center("789 HIGHWAY ROUTE 66"),
+          center(`STATION #${transaction.siteId}`),
+          divider,
+          center(dateStr),
+          leftPart + " ".repeat(Math.max(1, spaces)) + rightPart,
+          divider
+        ];
     
     let subtotal = 0;
     if (transaction.items && transaction.items.length > 0) {
@@ -711,8 +715,8 @@ ${indent}</${name}>`;
     lines.push("AUTH:" + " ".repeat(40 - 5 - authCode.length) + authCode);
     const reason = decision.reason.toUpperCase();
     lines.push("STATUS:" + " ".repeat(40 - 7 - reason.length) + reason);
-    lines.push("");
-    lines.push(" ".repeat(10) + "THANK YOU FOR YOUR VISIT");
+      lines.push("");
+      lines.push(center("THANK YOU FOR YOUR VISIT"));
     
     return lines.join("\n");
   }
