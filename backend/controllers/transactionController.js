@@ -2,7 +2,7 @@ const transactionService = require('../services/transactionService');
 const dbRepository = require('../repositories/dbRepository');
 
 async function handleRequestInfo(req, res) {
-  const { requestData, posData, loyaltyData, amountData } = req.body;
+  const { requestData, posData, loyaltyData, basketData } = req.body;
 
   if (!requestData || !requestData.requestType) {
     return res.status(400).json({ message: 'Missing requestData or requestType in body' });
@@ -11,22 +11,20 @@ async function handleRequestInfo(req, res) {
   console.log(`[HTTP POST] /request-info received RequestType: ${requestData.requestType}`);
 
   // Payload Optimization: Only process relevant data based on RequestType
-  let cleanAmountData = null;
+  let cleanBasketData = null;
   let cleanLoyaltyData = null;
 
-  // AmountData is needed for these types
-  const amountDataRequiredTypes = [
+  // BasketData is needed for these types
+  const basketDataRequiredTypes = [
     'CardPayment', 'CardPreAuthorisation', 'PreAuth+Fin.Advice', 
     'CardPaymentLoyaltyRedemption', 'LoyaltyAward'
   ];
 
-  if (amountDataRequiredTypes.includes(requestData.requestType) && amountData) {
-    // Only extract selected items to avoid payload bloat
-    let selectedSaleItems = [];
-    if (amountData.saleItems && Array.isArray(amountData.saleItems)) {
-      selectedSaleItems = amountData.saleItems.filter(item => item.isSelected === true || item.isSelected === 'true');
+  if (basketDataRequiredTypes.includes(requestData.requestType) && basketData) {
+    cleanBasketData = { ...basketData };
+    if (cleanBasketData.saleItems && Array.isArray(cleanBasketData.saleItems)) {
+      cleanBasketData.saleItems = cleanBasketData.saleItems.filter(item => item.isSelected === true || item.isSelected === 'true');
     }
-    cleanAmountData = { ...amountData, saleItems: selectedSaleItems };
   }
 
   // LoyaltyData is needed for these types
@@ -43,7 +41,7 @@ async function handleRequestInfo(req, res) {
   const fullRequestData = {
     requestData,
     posData,
-    amountData: cleanAmountData,
+    basketData: cleanBasketData,
     loyaltyData: cleanLoyaltyData
   };
 

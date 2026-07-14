@@ -7,6 +7,7 @@ async function dropTables() {
     
     await pool.query(`
       DROP TABLE IF EXISTS sale_items CASCADE;
+      DROP TABLE IF EXISTS basket_data CASCADE;
       DROP TABLE IF EXISTS amount_data CASCADE;
       DROP TABLE IF EXISTS pos_data CASCADE;
       DROP TABLE IF EXISTS loyalty CASCADE;

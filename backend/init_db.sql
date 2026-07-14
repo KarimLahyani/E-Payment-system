@@ -15,13 +15,7 @@ CREATE TABLE IF NOT EXISTS pos_data (
     language_code VARCHAR(10),
     card_entry_mode VARCHAR(50),
     shift_number VARCHAR(50),
-    terminal_batch VARCHAR(50),
-    status_request VARCHAR(50),
-    additional_info VARCHAR(255),
-    outdoor_position VARCHAR(50),
     clerk_id VARCHAR(50),
-    clerk_level VARCHAR(50),
-    service_level VARCHAR(50),
     pos_name VARCHAR(50),
     global BOOLEAN,
     split BOOLEAN,
@@ -32,7 +26,7 @@ CREATE TABLE IF NOT EXISTS pos_data (
     request_info_id INTEGER REFERENCES request_info(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS amount_data (
+CREATE TABLE IF NOT EXISTS basket_data (
     id SERIAL PRIMARY KEY,
     total_amount VARCHAR(50),
     pre_auth_amount VARCHAR(50),
@@ -59,20 +53,20 @@ SELECT 'Diesel', '102', 1.85, 'L', 'A'
 WHERE NOT EXISTS (SELECT 1 FROM products WHERE product_code = '102');
 
 INSERT INTO products (name, product_code, unit_price, unit_measure, tax_code)
-SELECT 'Coffee', '201', 2.50, 'EA', 'B'
+SELECT 'Coffee', '201', 2.50, 'Unit', 'B'
 WHERE NOT EXISTS (SELECT 1 FROM products WHERE product_code = '201');
 
 INSERT INTO products (name, product_code, unit_price, unit_measure, tax_code)
-SELECT 'Car Wash (Basic)', '301', 10.00, 'EA', 'C'
+SELECT 'Car Wash (Basic)', '301', 10.00, 'Unit', 'C'
 WHERE NOT EXISTS (SELECT 1 FROM products WHERE product_code = '301');
 
 INSERT INTO products (name, product_code, unit_price, unit_measure, tax_code)
-SELECT 'Sandwich', '202', 5.50, 'EA', 'B'
+SELECT 'Sandwich', '202', 5.50, 'Unit', 'B'
 WHERE NOT EXISTS (SELECT 1 FROM products WHERE product_code = '202');
 
 CREATE TABLE IF NOT EXISTS sale_items (
     id SERIAL PRIMARY KEY,
-    amount_data_id INTEGER REFERENCES amount_data(id) ON DELETE CASCADE,
+    basket_data_id INTEGER REFERENCES basket_data(id) ON DELETE CASCADE,
     product_code VARCHAR(255) REFERENCES products(product_code),
     amount VARCHAR(255),
     quantity VARCHAR(255),
@@ -81,8 +75,9 @@ CREATE TABLE IF NOT EXISTS sale_items (
     sale_channel VARCHAR(255),
     rebate_label VARCHAR(255),
     add_prod_info VARCHAR(255),
+    pump_id VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (amount_data_id, product_code)
+    UNIQUE (basket_data_id, product_code)
 );
 
 CREATE TABLE IF NOT EXISTS loyalty (

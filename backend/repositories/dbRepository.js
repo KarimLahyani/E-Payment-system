@@ -34,10 +34,10 @@ async function insertPosData(posData, requestId) {
   const result = await query(
     `INSERT INTO pos_data 
     (pos_timestamp, language_code, card_entry_mode, shift_number, terminal_batch, 
-    status_request, additional_info, outdoor_position, clerk_id, clerk_level, 
+    status_request, additional_info, clerk_id, clerk_level, 
     service_level, pos_name, global, split, long_format, unattended, waiting_card, 
     choice_pay_kind, request_info_id) 
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING *`,
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING *`,
     [
       posData.posTimestamp || null,
       posData.languageCode || null,
@@ -46,7 +46,6 @@ async function insertPosData(posData, requestId) {
       posData.terminalBatch || null,
       posData.statusRequest || null,
       posData.additionalInfo || null,
-      posData.outdoorPosition || null,
       posData.clerkId || null,
       posData.clerkLevel || null,
       posData.serviceLevel || null,
@@ -63,35 +62,45 @@ async function insertPosData(posData, requestId) {
   return result.rows[0];
 }
 
-async function insertAmountData(amountData, requestId) {
-  if (!amountData) return null;
+async function insertBasketData(basketData, requestId) {
+  if (!basketData) return null;
   const result = await query(
-    `INSERT INTO amount_data 
+    `INSERT INTO basket_data 
     (total_amount, pre_auth_amount, currency, request_info_id) 
     VALUES ($1, $2, $3, $4) RETURNING id`,
     [
-      amountData.totalAmount || '0',
-      amountData.preAuthAmount || '',
-      amountData.currency || 'EUR',
+      basketData.totalAmount || '0',
+      basketData.preAuthAmount || '',
+      basketData.currency || 'EUR',
       requestId
     ]
   );
   return result.rows[0].id;
 }
 
-async function insertSaleItems(saleItems, amountDataId) {
+async function insertSaleItems(saleItems, basketDataId) {
   if (!saleItems || !saleItems.length) return;
   const insertQuery = `
     INSERT INTO sale_items 
-    (amount_data_id, product_code, amount, quantity, add_prod_code, reverse_sale, 
-    sale_channel, rebate_label, add_prod_info, created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+    (basket_data_id, product_code, amount, quantity, add_prod_code, reverse_sale, 
+    sale_channel, rebate_label, add_prod_info, pump_id, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+    ON CONFLICT (basket_data_id, product_code)
+    DO UPDATE SET
+      amount = EXCLUDED.amount,
+      quantity = EXCLUDED.quantity,
+      add_prod_code = EXCLUDED.add_prod_code,
+      reverse_sale = EXCLUDED.reverse_sale,
+      sale_channel = EXCLUDED.sale_channel,
+      rebate_label = EXCLUDED.rebate_label,
+      add_prod_info = EXCLUDED.add_prod_info,
+      pump_id = EXCLUDED.pump_id
   `;
   for (const item of saleItems) {
     const productCode = item.productCode || item.product_code || '';
     if (productCode) {
       await query(insertQuery, [
-        amountDataId,
+        basketDataId,
         productCode,
         item.itemAmount || item.amount || '',
         item.quantity || '',
@@ -99,7 +108,8 @@ async function insertSaleItems(saleItems, amountDataId) {
         item.reverseSale || '0',
         item.saleChannel || '',
         item.rebateLabel || '',
-        item.addProdInfo || ''
+        item.addProdInfo || '',
+        item.pumpId || null
       ]);
     }
   }
@@ -159,9 +169,9 @@ async function getLastLoyaltyAwardResponse(stan) {
   return result.rows[0] || null;
 }
 
-async function getHighestAmountDataForRequest(requestId) {
+async function getHighestBasketDataForRequest(requestId) {
   const result = await query(
-    'SELECT * FROM amount_data WHERE request_info_id = $1 ORDER BY created_at ASC',
+    'SELECT * FROM basket_data WHERE request_info_id = $1 ORDER BY created_at ASC',
     [requestId]
   );
   if (result.rows.length === 0) return null;
@@ -176,7 +186,7 @@ async function getHighestAmountDataForRequest(requestId) {
   return highest;
 }
 
-async function getSaleItemsByAmountDataId(amountDataId) {
+async function getSaleItemsByBasketDataId(basketDataId) {
   const result = await query(
     `SELECT 
        s.*, 
@@ -188,8 +198,8 @@ async function getSaleItemsByAmountDataId(amountDataId) {
        p.tax_code
      FROM sale_items s
      JOIN products p ON s.product_code = p.product_code
-     WHERE s.amount_data_id = $1`,
-    [amountDataId]
+     WHERE s.basket_data_id = $1`,
+    [basketDataId]
   );
   return result.rows;
 }
@@ -226,13 +236,13 @@ module.exports = {
   query,
   insertRequestInfo,
   insertPosData,
-  insertAmountData,
+  insertBasketData,
   insertSaleItems,
   insertLoyaltyData,
   getProducts,
   getLastLoyaltyAwardResponse,
-  getHighestAmountDataForRequest,
-  getSaleItemsByAmountDataId,
+  getHighestBasketDataForRequest,
+  getSaleItemsByBasketDataId,
   upsertResponseInfo,
   getLastSaleItems
 };

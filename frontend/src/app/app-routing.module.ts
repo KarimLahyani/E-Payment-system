@@ -3,7 +3,7 @@ import { RouterModule, Routes } from '@angular/router';
 import { RequestInfoComponent } from './request-info/request-info.component';
 import { ResponseInfoComponent } from './response-info/response-info.component';
 import { PosDataComponent } from './pos-data/pos-data.component';
-import { AmountComponent } from './amount/amount.component';
+import { BasketComponent } from './basket/basket.component';
 import { LoyaltyComponent } from './loyalty/loyalty.component';
 
 const routes: Routes = [
@@ -12,7 +12,7 @@ const routes: Routes = [
     component: RequestInfoComponent,
     children: [
       { path: 'pos-data', component: PosDataComponent },
-      { path: 'amount', component: AmountComponent },
+      { path: 'basket', component: BasketComponent },
       { path: 'loyalty', component: LoyaltyComponent },
     ] 
   },

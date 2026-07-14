@@ -1,21 +1,21 @@
 import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
-import { SaleItem, AmountData } from '../models/full-request-data.model';
+import { SaleItem, BasketData } from '../models/full-request-data.model';
 import { RequestInfoService } from '../services/request-info.service';
 import { Subscription } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 
 @Component({
-  selector: 'app-amount',
-  templateUrl: './amount.component.html',
-  styleUrls: ['./amount.component.css']
+  selector: 'app-basket',
+  templateUrl: './basket.component.html',
+  styleUrls: ['./basket.component.css']
 })
-export class AmountComponent implements OnInit, OnDestroy {
+export class BasketComponent implements OnInit, OnDestroy {
   saleItemsList: SaleItem[] = [];
   displayedItems: SaleItem[] = [];
   currentIndex = 0;
   itemsPerPage = 10;
   selectedSaleItem: SaleItem | null = null;
-  amountData: AmountData = {
+  basketData: BasketData = {
     totalAmount: '0',
     preAuthAmount: '',
     currency: 'EUR',
@@ -39,7 +39,7 @@ export class AmountComponent implements OnInit, OnDestroy {
     discount: '0.00'
   };
 
-  lastAmountData: AmountData | null = null;
+  lastBasketData: BasketData | null = null;
   private dataSubscription: Subscription | undefined;
 
   constructor(
@@ -49,15 +49,15 @@ export class AmountComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const currentData = (this.requestInfoService as any).currentData;
-    if (currentData && currentData.amountData) {
-      this.amountData = JSON.parse(JSON.stringify(currentData.amountData));
+    if (currentData && currentData.basketData) {
+      this.basketData = JSON.parse(JSON.stringify(currentData.basketData));
     }
     
     this.initializeSaleItems();
     // loadLastSaleItems will be called inside initializeSaleItems to avoid race conditions
     this.updateDisplayedItems();
     this.subscribeToDataChanges();
-    this.updateAmountData();
+    this.updateBasketData();
   }
 
   ngOnDestroy(): void {
@@ -71,7 +71,7 @@ export class AmountComponent implements OnInit, OnDestroy {
       (products) => {
         if (products && products.length > 0) {
             this.saleItemsList = products.map(product => {
-              const existing = this.amountData.saleItems.find(i => i.productCode === product.productCode);
+              const existing = this.basketData.saleItems.find(i => i.productCode === product.productCode);
               return {
                 productName: product.productName,
                 productCode: product.productCode,
@@ -86,23 +86,24 @@ export class AmountComponent implements OnInit, OnDestroy {
                 rebateLabel: existing?.rebateLabel || '',
                 addProdInfo: existing?.addProdInfo || '',
                 isSelected: existing?.isSelected || false,
-                createdAt: existing?.createdAt || ''
+                createdAt: existing?.createdAt || '',
+                pumpId: existing?.pumpId || '01'
               };
             });
         } else {
           // Fallback if no products
           this.saleItemsList = [];
         }
-        this.amountData.saleItems = [...this.saleItemsList];
+        this.basketData.saleItems = [...this.saleItemsList];
         this.updateDisplayedItems();
         if (this.saleItemsList.length > 0) {
           this.selectedSaleItem = { ...this.saleItemsList[0] };
         }
       },
       (error) => {
-        console.error('Failed to initialize products in amount component', error);
+        console.error('Failed to initialize products in basket component', error);
         this.saleItemsList = [];
-        this.amountData.saleItems = [...this.saleItemsList];
+        this.basketData.saleItems = [...this.saleItemsList];
       }
     );
   }
@@ -131,12 +132,13 @@ export class AmountComponent implements OnInit, OnDestroy {
                 rebateLabel: matchingItem.rebateLabel || defaultItem.rebateLabel,
                 addProdInfo: defaultItem.addProdInfo || matchingItem.addProdInfo,
                 isSelected: matchingItem.isSelected !== undefined ? matchingItem.isSelected : defaultItem.isSelected,
-                createdAt: matchingItem.createdAt
+                createdAt: matchingItem.createdAt,
+                pumpId: matchingItem.pumpId || defaultItem.pumpId || '01'
               };
             }
             return defaultItem;
           });
-          this.amountData.saleItems = [...this.saleItemsList];
+          this.basketData.saleItems = [...this.saleItemsList];
           this.updateDisplayedItems();
           if (this.selectedSaleItem) {
             const updatedItem = this.saleItemsList.find(i => i.productName === this.selectedSaleItem?.productName);
@@ -144,7 +146,7 @@ export class AmountComponent implements OnInit, OnDestroy {
           }
         }
         console.log('saleItemsList après fusion:', JSON.stringify(this.saleItemsList, null, 2));
-        this.updateAmountData();
+        this.updateBasketData();
         this.cdr.detectChanges();
       },
       (error: HttpErrorResponse) => {
@@ -157,8 +159,8 @@ export class AmountComponent implements OnInit, OnDestroy {
     // The user requested that after a transaction, the basket should clear to 0 and all items should be deselected 
     // so the cashier is ready for the next customer.
     console.log('Transaction finished for requestId:', requestId, '. Clearing basket for next customer.');
-    this.amountData.totalAmount = '0.00';
-    this.amountData.preAuthAmount = '0.00';
+    this.basketData.totalAmount = '0.00';
+    this.basketData.preAuthAmount = '0.00';
     
     // Deselect all items
     this.saleItemsList = this.saleItemsList.map(item => ({
@@ -168,11 +170,11 @@ export class AmountComponent implements OnInit, OnDestroy {
       itemAmount: ''
     }));
     
-    this.amountData.saleItems = [];
+    this.basketData.saleItems = [];
     this.selectedSaleItem = null;
     
     this.updateDisplayedItems();
-    this.requestInfoService.updateData({ amountData: this.amountData });
+    this.requestInfoService.updateData({ basketData: this.basketData });
     this.cdr.detectChanges();
   }
 
@@ -217,7 +219,7 @@ export class AmountComponent implements OnInit, OnDestroy {
       }
       
       this.selectedSaleItem = { ...updatedItem };
-      this.updateAmountData();
+      this.updateBasketData();
     } else {
       this.selectedSaleItem = null;
     }
@@ -230,46 +232,46 @@ export class AmountComponent implements OnInit, OnDestroy {
       if (index !== -1) {
         this.saleItemsList[index] = { ...updatedItem, productName: this.saleItemsList[index].productName };
       }
-      const dataIndex = this.amountData.saleItems.findIndex(i => i.productName === updatedItem.productName);
+      const dataIndex = this.basketData.saleItems.findIndex(i => i.productName === updatedItem.productName);
       if (dataIndex !== -1) {
-        this.amountData.saleItems[dataIndex] = { ...updatedItem, productName: this.amountData.saleItems[dataIndex].productName };
+        this.basketData.saleItems[dataIndex] = { ...updatedItem, productName: this.basketData.saleItems[dataIndex].productName };
       }
       const displayedIndex = this.displayedItems.findIndex(i => i.productName === updatedItem.productName);
       if (displayedIndex !== -1) {
         this.displayedItems[displayedIndex] = { ...updatedItem, productName: this.displayedItems[displayedIndex].productName };
       }
-      this.updateAmountData();
+      this.updateBasketData();
       console.log('saleItemsList après mise à jour manuelle:', JSON.stringify(this.saleItemsList, null, 2));
-      console.log('amountData.saleItems après mise à jour manuelle:', JSON.stringify(this.amountData.saleItems, null, 2));
+      console.log('basketData.saleItems après mise à jour manuelle:', JSON.stringify(this.basketData.saleItems, null, 2));
     }
   }
 
-  onManualAmountChange() {
-    console.log('Manual amount updated:', this.amountData);
-    this.requestInfoService.updateData({ amountData: this.amountData });
+  onManualBasketChange() {
+    console.log('Manual basket updated:', this.basketData);
+    this.requestInfoService.updateData({ basketData: this.basketData });
   }
 
-  private updateAmountData() {
-    this.amountData.saleItems = [...this.saleItemsList];
+  private updateBasketData() {
+    this.basketData.saleItems = [...this.saleItemsList];
     const total = this.saleItemsList
       .filter(item => item.isSelected)
       .reduce((sum, item) => sum + (parseFloat(item.itemAmount) || 0), 0);
-    this.amountData.totalAmount = total.toFixed(2);
-    console.log('Updated totalAmount (updateAmountData):', this.amountData.totalAmount);
-    console.log('amountData avant envoi au service:', JSON.stringify(this.amountData, null, 2));
-    this.requestInfoService.updateData({ amountData: this.amountData });
+    this.basketData.totalAmount = total.toFixed(2);
+    console.log('Updated totalAmount (updateBasketData):', this.basketData.totalAmount);
+    console.log('basketData avant envoi au service:', JSON.stringify(this.basketData, null, 2));
+    this.requestInfoService.updateData({ basketData: this.basketData });
   }
 
-  private loadLastAmountData() {
-    this.requestInfoService.getLastAmountData().subscribe(
-      (data: AmountData) => {
-        this.lastAmountData = { ...data };
-        this.amountData = { ...this.amountData, ...data };
-        console.log('Dernières données Amount Data chargées:', JSON.stringify(this.lastAmountData, null, 2));
+  private loadLastBasketData() {
+    this.requestInfoService.getLastBasketData().subscribe(
+      (data: BasketData) => {
+        this.lastBasketData = { ...data };
+        this.basketData = { ...this.basketData, ...data };
+        console.log('Dernières données Basket Data chargées:', JSON.stringify(this.lastBasketData, null, 2));
         this.cdr.detectChanges();
       },
       (error: HttpErrorResponse) => {
-        console.error('Erreur lors du chargement des dernières données Amount Data:', error);
+        console.error('Erreur lors du chargement des dernières données Basket Data:', error);
       }
     );
   }
@@ -278,7 +280,7 @@ export class AmountComponent implements OnInit, OnDestroy {
     this.dataSubscription = this.requestInfoService.dataChange$.subscribe((data: any) => {
       console.log('Données reçues via dataChange$:', JSON.stringify(data, null, 2));
     if (data === true) {
-      console.log('Mise à jour globale détectée, rafraîchissement de AmountComponent');
+      console.log('Mise à jour globale détectée, rafraîchissement de BasketComponent');
       this.updateDisplayedItems();
       this.cdr.detectChanges();
       } else if (typeof data === 'object' && data !== null) {
@@ -286,11 +288,11 @@ export class AmountComponent implements OnInit, OnDestroy {
           this.refreshAfterResponse(data.refreshRequestId);
         }
 
-        if (data.amountData) {
+        if (data.basketData) {
           const currentSaleItems = [...this.saleItemsList];
-          this.amountData = { ...this.amountData, ...data.amountData };
-          if (data.amountData.saleItems && data.amountData.saleItems.length > 0) {
-            this.saleItemsList = data.amountData.saleItems.map((item: SaleItem) => {
+          this.basketData = { ...this.basketData, ...data.basketData };
+          if (data.basketData.saleItems && data.basketData.saleItems.length > 0) {
+            this.saleItemsList = data.basketData.saleItems.map((item: SaleItem) => {
               const existingItem = currentSaleItems.find(i => i.productCode === item.productCode || i.productName === item.productName);
               return {
                 ...item,
@@ -310,16 +312,16 @@ export class AmountComponent implements OnInit, OnDestroy {
                 createdAt: item.createdAt
               };
             });
-            this.amountData.saleItems = [...this.saleItemsList];
+            this.basketData.saleItems = [...this.saleItemsList];
             if (this.selectedSaleItem) {
               const updatedItem = this.saleItemsList.find(i => i.productName === this.selectedSaleItem?.productName);
               this.selectedSaleItem = updatedItem ? { ...updatedItem } : null;
             }
             this.updateDisplayedItems();
           }
-          this.updateAmountData();
+          this.updateBasketData();
           console.log('saleItemsList après mise à jour via dataChange$:', JSON.stringify(this.saleItemsList, null, 2));
-          console.log('amountData.saleItems après mise à jour via dataChange$:', JSON.stringify(this.amountData.saleItems, null, 2));
+          console.log('basketData.saleItems après mise à jour via dataChange$:', JSON.stringify(this.basketData.saleItems, null, 2));
         }
       }
     });

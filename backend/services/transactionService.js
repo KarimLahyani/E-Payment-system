@@ -4,7 +4,7 @@ const { generateServiceRequest } = require('../xmlGenerator');
 const { addMessageToSend } = require('../tcpHandler');
 
 async function processTransaction(fullRequestData) {
-  const { requestData, posData, amountData, loyaltyData } = fullRequestData;
+  const { requestData, posData, basketData, loyaltyData } = fullRequestData;
 
   // 1. Create a brand new Request Info in the ledger
   const nextRequestId = await dbRepository.insertRequestInfo(requestData);
@@ -25,10 +25,10 @@ async function processTransaction(fullRequestData) {
       await dbRepository.insertPosData(posData, nextRequestId);
     }
 
-    if (amountData) {
-      const amountDataId = await dbRepository.insertAmountData(amountData, nextRequestId);
-      if (amountData.saleItems && amountData.saleItems.length > 0) {
-        await dbRepository.insertSaleItems(amountData.saleItems, amountDataId);
+    if (basketData) {
+      const basketDataId = await dbRepository.insertBasketData(basketData, nextRequestId);
+      if (basketData.saleItems && basketData.saleItems.length > 0) {
+        await dbRepository.insertSaleItems(basketData.saleItems, basketDataId);
       }
     }
 
@@ -41,7 +41,7 @@ async function processTransaction(fullRequestData) {
   requestData.requestId = nextRequestId.toString();
 
   // 4. Generate the XML payload
-  const serviceRequest = await generateServiceRequest(requestData, posData, amountData, loyaltyData);
+  const serviceRequest = await generateServiceRequest(requestData, posData, basketData, loyaltyData);
   console.log('Generated Service Request XML:', Buffer.isBuffer(serviceRequest) ? serviceRequest.toString('latin1') : serviceRequest);
 
   // 5. Dispatch via TCP

@@ -3,8 +3,8 @@ const { pool } = require('./database');
 // Fonction pour normaliser les noms de produits
 const normalizeProductName = (label) => label.charAt(0).toUpperCase() + label.slice(1);
 
-const prepareSaleItemValues = (item, amountDataId) => [
-  amountDataId,
+const prepareSaleItemValues = (item, basketDataId) => [
+  basketDataId,
   item.productCode || '',
   item.itemAmount || item.amount || '',
   item.quantity || '',
@@ -12,7 +12,8 @@ const prepareSaleItemValues = (item, amountDataId) => [
   item.reverseSale || '',
   item.saleChannel || '',
   item.rebateLabel || '',
-  item.addProdInfo || ''
+  item.addProdInfo || '',
+  item.pumpId || item.pump_id || ''
 ];
 
 // Transformer un SaleItem pour la réponse API

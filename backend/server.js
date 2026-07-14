@@ -57,28 +57,34 @@ app.use(express.json());
 // Serve the standalone terminal simulator
 app.use('/simulator', express.static(path.join(__dirname, '../terminal-simulator')));
 
-// Connexion à la base de données
-connectDB().catch(err => {
-  console.error('Failed to connect to database, exiting...', err);
-  process.exit(1);
-});
-
-// Configuration des routes
-setupRoutes(app);
-
-// Endpoint pour récupérer la dernière réponse XML
-app.get('/last-response-xml', (req, res) => {
-  if (!lastResponseXML) {
-    return res.status(404).json({ message: 'No response XML available' });
-  }
-  res.status(200).json({ responseXML: lastResponseXML });
-});
-
 // Démarrer le serveur Express et le serveur TCP
-httpServer.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
-  startTcpServer();
-});
+async function startServer() {
+  try {
+    // Connexion à la base de données
+    await connectDB();
+    
+    // Configuration des routes
+    setupRoutes(app);
+
+    // Endpoint pour récupérer la dernière réponse XML
+    app.get('/last-response-xml', (req, res) => {
+      if (!lastResponseXML) {
+        return res.status(404).json({ message: 'No response XML available' });
+      }
+      res.status(200).json({ responseXML: lastResponseXML });
+    });
+
+    httpServer.listen(port, () => {
+      console.log(`Server running on http://localhost:${port}`);
+      startTcpServer();
+    });
+  } catch (err) {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 // Gestion de l'arrêt du serveur
 process.on('SIGINT', () => {

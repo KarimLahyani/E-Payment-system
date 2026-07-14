@@ -23,7 +23,7 @@ const formatNumberWithLeadingZeros = (value, integerLength, decimalLength = 0) =
   return decimalLength > 0 ? `${paddedInteger}.${decimalPart.padEnd(decimalLength, '0')}` : paddedInteger;
 };
 
-const generateServiceRequest = async (requestData, posData, amountData, loyaltyData) => {
+const generateServiceRequest = async (requestData, posData, basketData, loyaltyData) => {
   const requestType = String(requestData.requestType || 'Unknown').trim();
   const requestId = String(requestData.requestId || '0').trim();
   const popId = String(requestData.popId || '01').trim();
@@ -32,12 +32,12 @@ const generateServiceRequest = async (requestData, posData, amountData, loyaltyD
 
   const formatTimestamp = (timestamp) => {
     const date = new Date(timestamp || Date.now());
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const hours = String(date.getUTCHours()).padStart(2, '0');
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
     return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
   };
 
@@ -69,7 +69,10 @@ const generateServiceRequest = async (requestData, posData, amountData, loyaltyD
     const serviceLevel = String(posData?.serviceLevel || '').trim();
     const transactionNumber = String(posData?.transactionNumber || '').trim();
 
-    const posDataLine1 = `    <POSData LanguageCode="${languageCode}" ClerkLevel="${clerkLevel}">`;
+    const cardEntryMode = String(posData?.cardEntryMode || '').trim();
+    const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
+
+    const posDataLine1 = `    <POSData LanguageCode="${languageCode}" ClerkLevel="${clerkLevel}"${cardEntryAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
     const posDataLine3 = serviceLevel ? `        <ServiceLevel>${serviceLevel}</ServiceLevel>` : '';
     const posDataLine4 = shiftNumber ? `        <ShiftNumber>${shiftNumber}</ShiftNumber>` : '';
@@ -84,7 +87,10 @@ const generateServiceRequest = async (requestData, posData, amountData, loyaltyD
     const clerkId = String(posData?.clerkId || '').trim();
     const transactionNumber = String(posData?.transactionNumber || '').trim();
 
-    const posDataLine1 = `    <POSData LanguageCode="${languageCode}">`;
+    const cardEntryMode = String(posData?.cardEntryMode || '').trim();
+    const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
+
+    const posDataLine1 = `    <POSData LanguageCode="${languageCode}"${cardEntryAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
     const posDataLine3 = shiftNumber ? `        <ShiftNumber>${shiftNumber}</ShiftNumber>` : '';
     const posDataLine4 = clerkId ? `        <ClerkID>${clerkId}</ClerkID>` : '';
@@ -99,8 +105,10 @@ const generateServiceRequest = async (requestData, posData, amountData, loyaltyD
     const clerkLevel = String(posData?.clerkLevel || '5').trim();
     const transactionNumber = String(posData?.transactionNumber || '').trim();
     const track2 = String(posData?.track2 || '').trim();
+    const cardEntryMode = String(posData?.cardEntryMode || '').trim();
+    const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
 
-    const posDataLine1 = `    <POSData LanguageCode="${languageCode}" ClerkLevel="${clerkLevel}"${track2 ? ` Track2="${track2}"` : ''}>`;
+    const posDataLine1 = `    <POSData LanguageCode="${languageCode}" ClerkLevel="${clerkLevel}"${track2 ? ` Track2="${track2}"` : ''}${cardEntryAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
     const posDataLine3 = shiftNumber ? `        <ShiftNumber>${shiftNumber}</ShiftNumber>` : '';
     const posDataLine4 = clerkId ? `        <ClerkID>${clerkId}</ClerkID>` : '';
@@ -117,8 +125,10 @@ const generateServiceRequest = async (requestData, posData, amountData, loyaltyD
     const terminalType = String(posData?.terminalType || 'IPP48').trim();
     const clerkId = String(posData?.clerkId || '555').trim();
     const posName = String(posData?.posName || '8').trim();
+    const cardEntryMode = String(posData?.cardEntryMode || '').trim();
+    const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
 
-    const posDataLine1 = `    <POSData LanguageCode="${languageCode}" ClerkLevel="${clerkLevel}" Unattended="${unattended}">`;
+    const posDataLine1 = `    <POSData LanguageCode="${languageCode}" ClerkLevel="${clerkLevel}" Unattended="${unattended}"${cardEntryAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
     const posDataLine3 = clerkId ? `        <ClerkID>${clerkId}</ClerkID>` : '';
     
@@ -128,24 +138,28 @@ const generateServiceRequest = async (requestData, posData, amountData, loyaltyD
   } else if (requestType === 'CardPayment' || requestType === 'LoyaltyBalanceQuery') {
     const clerkLevel = String(posData?.clerkLevel || '5').trim();
     const languageCode = String(posData?.languageCode || 'es').trim();
+    const cardEntryMode = String(posData?.cardEntryMode || '').trim();
+    const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
 
-    const posDataLine1 = `    <POSData ClerkLevel="${clerkLevel}" LanguageCode="${languageCode}">`;
+    const posDataLine1 = `    <POSData ClerkLevel="${clerkLevel}" LanguageCode="${languageCode}"${cardEntryAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
     const posDataLine3 = `    </POSData>`;
 
     posDataSection = [posDataLine1, posDataLine2, posDataLine3].filter(line => line).join('\n');
   } else {
-    const posDataLine1 = `    <POSData>`;
+    const cardEntryMode = String(posData?.cardEntryMode || '').trim();
+    const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
+    const posDataLine1 = `    <POSData${cardEntryAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
     const posDataLine3 = `    </POSData>`;
     posDataSection = [posDataLine1, posDataLine2, posDataLine3].filter(line => line).join('\n');
   }
 
   let originalTransactionSection = '';
-  if (requestType === 'PaymentRefundLoyaltyRedemptionRefund' && amountData?.originalTransaction) {
-    const terminalId = String(amountData.originalTransaction.terminalId || '').trim();
-    const terminalBatch = String(amountData.originalTransaction.terminalBatch || '').trim();
-    const stan = String(amountData.originalTransaction.stan || '').trim();
+  if (requestType === 'PaymentRefundLoyaltyRedemptionRefund' && basketData?.originalTransaction) {
+    const terminalId = String(basketData.originalTransaction.terminalId || '').trim();
+    const terminalBatch = String(basketData.originalTransaction.terminalBatch || '').trim();
+    const stan = String(basketData.originalTransaction.stan || '').trim();
 
     if (terminalId && terminalBatch && stan) {
       originalTransactionSection = `    <OriginalTransaction TerminalID="${terminalId}" TerminalBatch="${terminalBatch}" STAN="${stan}"></OriginalTransaction>`;
@@ -209,15 +223,15 @@ const generateServiceRequest = async (requestData, posData, amountData, loyaltyD
 
   let totalAmountSection = '';
   if (requestType === 'LoyaltyAward' || requestType === 'LoyaltyAwardRefund' || requestType === 'PaymentRefundLoyaltyRedemptionRefund' || requestType === 'CardPayment') {
-    const totalAmount = formatNumberWithLeadingZeros(amountData?.totalAmount || '0.00', 7, 2);
-    const currency = String(amountData?.currency || 'EUR').trim();
+    const totalAmount = formatNumberWithLeadingZeros(basketData?.totalAmount || '0.00', 7, 2);
+    const currency = String(basketData?.currency || 'EUR').trim();
 
     totalAmountSection = `    <TotalAmount Currency="${currency}">${totalAmount}</TotalAmount>`;
   }
 
   let saleItemsSection = '';
-  if ((requestType === 'LoyaltyAward' || requestType === 'LoyaltyAwardRefund' || requestType === 'PaymentRefundLoyaltyRedemptionRefund' || requestType === 'CardPayment') && amountData?.saleItems && Array.isArray(amountData.saleItems)) {
-    const selectedItems = amountData.saleItems.filter(item => item.isSelected === true || item.isSelected === 'true');
+  if ((requestType === 'LoyaltyAward' || requestType === 'LoyaltyAwardRefund' || requestType === 'PaymentRefundLoyaltyRedemptionRefund' || requestType === 'CardPayment') && basketData?.saleItems && Array.isArray(basketData.saleItems)) {
+    const selectedItems = basketData.saleItems;
 
     if (selectedItems.length > 0) {
       saleItemsSection = selectedItems.map((item, index) => {
@@ -234,6 +248,7 @@ const generateServiceRequest = async (requestData, posData, amountData, loyaltyD
         const saleChannel = String(item.saleChannel || '').trim();
 
         const productName = String(item.productName || '').trim();
+        const pumpId = String(item.pumpId || '').trim();
         
         const saleItemLine1 = `    <SaleItem ItemID="${itemId}"${reverseSale === 'true' ? ` ReverseSale="${reverseSale}"` : ''}>`;
         const saleItemLine2 = `        <ProductCode>${productCode}</ProductCode>`;
@@ -246,9 +261,10 @@ const generateServiceRequest = async (requestData, posData, amountData, loyaltyD
         const saleItemLine9 = additionalProductInfo ? `        <AdditionalProductInfo>${additionalProductInfo}</AdditionalProductInfo>` : '';
         const saleItemLine10 = saleChannel ? `        <SaleChannel>${saleChannel}</SaleChannel>` : '';
         const saleItemLine11 = productName ? `        <ProductName>${productName}</ProductName>` : '';
-        const saleItemLine12 = `    </SaleItem>`;
+        const saleItemLine12 = pumpId ? `        <OutdoorPosition>${pumpId}</OutdoorPosition>` : '';
+        const saleItemLine13 = `    </SaleItem>`;
 
-        return [saleItemLine1, saleItemLine2, saleItemLine3, saleItemLine4, saleItemLine5, saleItemLine6, saleItemLine7, saleItemLine8, saleItemLine9, saleItemLine10, saleItemLine11, saleItemLine12]
+        return [saleItemLine1, saleItemLine2, saleItemLine3, saleItemLine4, saleItemLine5, saleItemLine6, saleItemLine7, saleItemLine8, saleItemLine9, saleItemLine10, saleItemLine11, saleItemLine12, saleItemLine13]
           .filter(line => line)
           .join('\n');
       }).join('\n');

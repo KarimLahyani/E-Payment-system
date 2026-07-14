@@ -30,55 +30,55 @@ const setupRoutes = (app) => {
       const loyaltyAwardRequestId = loyaltyAwardResponseResult.rows[0].id;
       console.log(`Found LoyaltyAward response with id: ${loyaltyAwardRequestId}, stan: ${stan}`);
 
-      // Step 2: Find all amount_data entries for the LoyaltyAward request
-      const amountDataResult = await pool.query(
-        'SELECT id, total_amount, pre_auth_amount, currency FROM amount_data WHERE request_info_id = $1 ORDER BY created_at',
+      // Step 2: Find all basket_data entries for the LoyaltyAward request
+      const basketDataResult = await pool.query(
+        'SELECT id, total_amount, pre_auth_amount, currency FROM basket_data WHERE request_info_id = $1 ORDER BY created_at',
         [loyaltyAwardRequestId]
       );
 
-      if (amountDataResult.rows.length === 0) {
-        console.error(`No amount_data found for LoyaltyAward request id: ${loyaltyAwardRequestId}`);
-        return { success: false, message: 'No amount data found for the LoyaltyAward request.' };
+      if (basketDataResult.rows.length === 0) {
+        console.error(`No basket_data found for LoyaltyAward request id: ${loyaltyAwardRequestId}`);
+        return { success: false, message: 'No basket data found for the LoyaltyAward request.' };
       }
 
       // Find the row with the highest total_amount
-      let highestAmountData = amountDataResult.rows[0];
-      for (const row of amountDataResult.rows) {
-        if (parseFloat(row.total_amount) > parseFloat(highestAmountData.total_amount)) {
-          highestAmountData = row;
+      let highestBasketData = basketDataResult.rows[0];
+      for (const row of basketDataResult.rows) {
+        if (parseFloat(row.total_amount) > parseFloat(highestBasketData.total_amount)) {
+          highestBasketData = row;
         }
       }
 
-      const originalAmountDataId = highestAmountData.id;
-      const originalTotalAmount = highestAmountData.total_amount;
-      const preAuthAmount = highestAmountData.pre_auth_amount || '';
-      const currency = highestAmountData.currency || 'EUR';
+      const originalBasketDataId = highestBasketData.id;
+      const originalTotalAmount = highestBasketData.total_amount;
+      const preAuthAmount = highestBasketData.pre_auth_amount || '';
+      const currency = highestBasketData.currency || 'EUR';
       
-      console.log(`Highest total_amount found: ${originalTotalAmount} with amount_data.id: ${originalAmountDataId}`);
+      console.log(`Highest total_amount found: ${originalTotalAmount} with basket_data.id: ${originalBasketDataId}`);
 
-      // Step 3: Insert a new row in amount_data with the original total_amount
-      const newAmountResult = await pool.query(
-        'INSERT INTO amount_data (total_amount, pre_auth_amount, currency, request_info_id, created_at) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP) RETURNING id',
+      // Step 3: Insert a new row in basket_data with the original total_amount
+      const newBasketResult = await pool.query(
+        'INSERT INTO basket_data (total_amount, pre_auth_amount, currency, request_info_id, created_at) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP) RETURNING id',
         [originalTotalAmount, preAuthAmount, currency, currentRequestId]
       );
-      const newAmountDataId = newAmountResult.rows[0].id;
-      console.log(`Successfully inserted new row in amount_data with id ${newAmountDataId} and total_amount ${originalTotalAmount} for request_info_id ${currentRequestId}`);
+      const newBasketDataId = newBasketResult.rows[0].id;
+      console.log(`Successfully inserted new row in basket_data with id ${newBasketDataId} and total_amount ${originalTotalAmount} for request_info_id ${currentRequestId}`);
 
-      // Step 4: Copy the original sale items to the new amount_data
+      // Step 4: Copy the original sale items to the new basket_data
       const originalSaleItemsResult = await pool.query(
-        'SELECT * FROM sale_items WHERE amount_data_id = $1',
-        [originalAmountDataId]
+        'SELECT * FROM sale_items WHERE basket_data_id = $1',
+        [originalBasketDataId]
       );
 
       const saleItemsQuery = `
-        INSERT INTO sale_items (amount_data_id, product_code, amount, quantity, add_prod_code, reverse_sale, sale_channel, rebate_label, add_prod_info, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+        INSERT INTO sale_items (basket_data_id, product_code, amount, quantity, add_prod_code, reverse_sale, sale_channel, rebate_label, add_prod_info, pump_id, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
         RETURNING *
       `;
 
       for (const item of originalSaleItemsResult.rows) {
         const saleItemValues = [
-          newAmountDataId,             // amount_data_id (new)
+          newBasketDataId,             // basket_data_id (new)
           item.product_code || '',     // product_code
           item.amount,                 // amount
           item.quantity || '',         // quantity
@@ -86,11 +86,12 @@ const setupRoutes = (app) => {
           item.reverse_sale || '0',    // reverse_sale
           item.sale_channel || '',     // sale_channel
           '',                          // rebate_label (reset to empty)
-          item.add_prod_info || ''     // add_prod_info
+          item.add_prod_info || '',    // add_prod_info
+          item.pump_id || ''           // pump_id
         ];
 
         const result = await pool.query(saleItemsQuery, saleItemValues);
-        console.log(`Restored original sale_item with amount ${item.amount} for amount_data_id ${newAmountDataId}`);
+        console.log(`Restored original sale_item with amount ${item.amount} for basket_data_id ${newBasketDataId}`);
       }
 
       return { success: true, message: 'LoyaltyAward discounts undone successfully.' };
@@ -181,24 +182,24 @@ const setupRoutes = (app) => {
 
   // Endpoint pour traiter les données de request-info
   app.post('/request-info', async (req, res) => {
-    const { requestData, posData, loyaltyData, amountData } = req.body;
+    const { requestData, posData, loyaltyData, basketData } = req.body;
 
     if (!requestData) {
       return res.status(400).json({ message: 'Missing requestData in body' });
     }
 
     console.log('Raw request body:', req.body);
-    console.log('Raw amountData:', amountData);
+    console.log('Raw basketData:', basketData);
 
     let selectedSaleItems = [];
-    if (amountData && amountData.saleItems && Array.isArray(amountData.saleItems)) {
-      selectedSaleItems = amountData.saleItems.filter(item => item.isSelected === true || item.isSelected === 'true');
+    if (basketData && basketData.saleItems && Array.isArray(basketData.saleItems)) {
+      selectedSaleItems = basketData.saleItems.filter(item => item.isSelected === true || item.isSelected === 'true');
       console.log('Selected saleItems from request:', selectedSaleItems);
     } else {
       console.log('No saleItems provided in request.');
     }
 
-    const updatedAmountData = { ...amountData, saleItems: selectedSaleItems };
+    const updatedBasketData = { ...basketData, saleItems: selectedSaleItems };
 
     const updatedRequestData = { ...requestData, requestId: null };
 
@@ -257,7 +258,7 @@ const setupRoutes = (app) => {
     updatedRequestData.requestId = nextRequestId.toString();
 
     // Générer le service request XML
-    const serviceRequestPromise = generateServiceRequest(updatedRequestData, posData, updatedAmountData, loyaltyData);
+    const serviceRequestPromise = generateServiceRequest(updatedRequestData, posData, updatedBasketData, loyaltyData);
     const serviceRequest = await serviceRequestPromise;
     lastServiceRequest = serviceRequest;
     console.log('Generated Service Request XML:', Buffer.isBuffer(serviceRequest) ? serviceRequest.toString('latin1') : serviceRequest);
@@ -272,51 +273,47 @@ const setupRoutes = (app) => {
           posData.languageCode || null,
           posData.cardEntryMode || null,
           posData.shiftNumber || null,
-          posData.terminalBatch || null,
-          posData.statusRequest || null,
-          posData.additionalInfo || null,
           posData.outdoorPosition || null,
           posData.clerkId || null,
-          posData.clerkLevel || null,
-          posData.serviceLevel || null,
           posData.posName || null,
-          posData.global || false,
           posData.split || false,
-          posData.longFormat || false,
           posData.unattended || false,
-          posData.waitingCard || false,
-          posData.choicePayKind || false,
           requestId,
         ];
         await insertWithErrorHandling(
-          'INSERT INTO pos_data (pos_timestamp, language_code, card_entry_mode, shift_number, terminal_batch, status_request, additional_info, outdoor_position, clerk_id, clerk_level, service_level, pos_name, global, split, long_format, unattended, waiting_card, choice_pay_kind, request_info_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING *',
+          'INSERT INTO pos_data (pos_timestamp, language_code, card_entry_mode, shift_number, outdoor_position, clerk_id, pos_name, split, unattended, request_info_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
           posValues,
           'Pos data inserted successfully:'
         );
       }
 
-      if (amountData && updatedRequestData.requestType !== 'LoyaltyAwardRefund') {
-        const { totalAmount, preAuthAmount, currency, itemDetails } = amountData;
-
-          const amountResult = await pool.query(
-            'INSERT INTO amount_data (total_amount, pre_auth_amount, currency, request_info_id) VALUES ($1, $2, $3, $4) RETURNING id',
+      if (basketData && updatedRequestData.requestType !== 'LoyaltyAwardRefund') {
+        const { totalAmount, preAuthAmount, currency, itemDetails } = basketData;
+        try {
+          const basketResult = await pool.query(
+            'INSERT INTO basket_data (total_amount, pre_auth_amount, currency, request_info_id) VALUES ($1, $2, $3, $4) RETURNING id',
             [totalAmount || '0', preAuthAmount || '', currency || 'EUR', requestId]
           );
-        const amountDataId = amountResult.rows[0].id;
-        console.log('Inserted amount_data with id:', amountDataId, 'for request_info_id:', requestId);
+          const basketDataId = basketResult.rows[0].id;
+          console.log('Inserted basket_data with id:', basketDataId, 'for request_info_id:', requestId);
 
-        const saleItemsQuery = `
-          INSERT INTO sale_items (amount_data_id, product_code, amount, quantity, add_prod_code, reverse_sale, sale_channel, rebate_label, add_prod_info, created_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
-          RETURNING *
-        `;
-
-        for (const item of selectedSaleItems) {
-          await insertWithErrorHandling(
-            saleItemsQuery,
-            prepareSaleItemValues(item, amountDataId),
-            `Successfully inserted sale_item:`
-          );
+          const saleItemsQuery = `
+            INSERT INTO sale_items (basket_data_id, product_code, amount, quantity, add_prod_code, reverse_sale, sale_channel, rebate_label, add_prod_info, pump_id, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+            ON CONFLICT (basket_data_id, product_code) 
+            DO UPDATE SET amount = $3, quantity = $4, add_prod_code = $5, reverse_sale = $6, sale_channel = $7, rebate_label = $8, add_prod_info = $9, pump_id = $10, created_at = CURRENT_TIMESTAMP
+          `;
+          
+          for (const item of selectedSaleItems) {
+            await insertWithErrorHandling(
+              saleItemsQuery,
+              prepareSaleItemValues(item, basketDataId),
+              `Successfully inserted sale_item:`
+            );
+          }
+        } catch (error) {
+          console.error('Erreur lors de l\'insertion de basketData:', error);
+          throw error;
         }
       }
 
@@ -508,20 +505,11 @@ const setupRoutes = (app) => {
           languageCode: posData.language_code || '',
           cardEntryMode: posData.card_entry_mode || '',
           shiftNumber: posData.shift_number || '',
-          terminalBatch: posData.terminal_batch || '',
-          statusRequest: posData.status_request || '',
-          additionalInfo: posData.additional_info || '',
           outdoorPosition: posData.outdoor_position || '',
           clerkId: posData.clerk_id || '',
-          clerkLevel: posData.clerk_level || '',
-          serviceLevel: posData.service_level || '',
           posName: posData.pos_name || '',
-          global: posData.global || false,
           split: posData.split || false,
-          longFormat: posData.long_format || false,
           unattended: posData.unattended || false,
-          waitingCard: posData.waiting_card || false,
-          choicePayKind: posData.choice_pay_kind || false,
           requestInfoId: posData.request_info_id || null,
         });
       } else {
@@ -565,112 +553,102 @@ const setupRoutes = (app) => {
     }
   });
 
-  app.get('/last-amount', async (req, res) => {
+  app.get('/latest-basket-data', async (req, res) => {
     try {
       const result = await pool.query(
-        'SELECT * FROM amount_data WHERE created_at IS NOT NULL ORDER BY created_at DESC LIMIT 1'
+        'SELECT * FROM basket_data WHERE created_at IS NOT NULL ORDER BY created_at DESC LIMIT 1'
       );
       if (result.rows.length > 0) {
-        const amountData = result.rows[0];
+        const basketData = result.rows[0];
         const saleItemsResult = await pool.query(
           `SELECT si.*, p.name as button_label, p.unit_price, p.unit_measure, p.tax_code 
            FROM sale_items si 
            LEFT JOIN products p ON si.product_code = p.product_code 
-           WHERE si.amount_data_id = $1 
+           WHERE si.basket_data_id = $1 
            ORDER BY si.id`,
-          [amountData.id]
+          [basketData.id]
         );
 
         const responseData = {
-          id: amountData.id,
-          totalAmount: amountData.total_amount || '0',
-          preAuthAmount: amountData.pre_auth_amount || '0',
-          currency: amountData.currency || 'EUR',
-          itemDetails: amountData.item_details && typeof amountData.item_details === 'string'
+          id: basketData.id,
+          totalAmount: basketData.total_amount || '0',
+          preAuthAmount: basketData.pre_auth_amount || '0',
+          currency: basketData.currency || 'EUR',
+          itemDetails: basketData.item_details && typeof basketData.item_details === 'string'
             ? (() => {
                 try {
-                  return JSON.parse(amountData.item_details);
+                  return JSON.parse(basketData.item_details);
                 } catch (error) {
                   console.error('Error parsing item_details:', error);
                   return {};
                 }
               })()
-            : amountData.item_details || {},
-          requestInfoId: amountData.request_info_id || null,
-          createdAt: amountData.created_at || '',
+            : basketData.item_details || {},
+          requestInfoId: basketData.request_info_id || null,
+          createdAt: basketData.created_at || '',
           saleItems: saleItemsResult.rows.map(item => ({
             itemId: item.item_id || '',
             buttonLabel: item.button_label || '',
             productCode: item.product_code || '',
-            amount: item.amount || '',
+            itemAmount: item.amount || '',
             quantity: item.quantity || '',
             taxCode: item.tax_code || '',
             addProdCode: item.add_prod_code || '',
             reverseSale: item.reverse_sale || '',
-            unitPrice: item.unit_price || '',
-            unitMeasure: item.unit_measure || '',
             saleChannel: item.sale_channel || '',
             rebateLabel: item.rebate_label || '',
             addProdInfo: item.add_prod_info || '',
+            pumpId: item.pump_id || '',
             isSelected: true,
             createdAt: item.created_at || '',
-          })),
+          }))
         };
         res.status(200).json(responseData);
       } else {
-        res.status(404).json({
-          id: 1,
-          totalAmount: '0',
-          preAuthAmount: '0',
-          currency: 'EUR',
-          itemDetails: {},
-          requestInfoId: null,
-          createdAt: '',
-          saleItems: generateDefaultSaleItems(),
-        });
+        res.status(404).json({ message: 'No basket_data found' });
       }
     } catch (error) {
-      console.error('Erreur lors de la récupération des données de amount_data:', error);
+      console.error('Erreur lors de la récupération du dernier basket_data:', error);
       res.status(500).json({ message: 'Internal server error', error: error.message });
     }
   });
 
-  // Endpoint to fetch amount_data by request_info_id
-  app.get('/amount-data/by-request/:id', async (req, res) => {
+  // Endpoint to fetch basket by request_info_id
+  app.get('/basket/by-request/:id', async (req, res) => {
     try {
       const { id } = req.params;
       const result = await pool.query(
-        'SELECT * FROM amount_data WHERE request_info_id = $1 ORDER BY created_at DESC LIMIT 1',
+        'SELECT * FROM basket_data WHERE request_info_id = $1 ORDER BY created_at DESC LIMIT 1',
         [id]
       );
       if (result.rows.length > 0) {
-        const amountData = result.rows[0];
+        const basketData = result.rows[0];
         const saleItemsResult = await pool.query(
           `SELECT si.*, p.name as button_label, p.unit_price, p.unit_measure, p.tax_code 
            FROM sale_items si 
            LEFT JOIN products p ON si.product_code = p.product_code 
-           WHERE si.amount_data_id = $1 
+           WHERE si.basket_data_id = $1 
            ORDER BY si.id`,
-          [amountData.id]
+          [basketData.id]
         );
 
         const responseData = {
-          id: amountData.id,
-          totalAmount: amountData.total_amount || '0',
-          preAuthAmount: amountData.pre_auth_amount || '0',
-          currency: amountData.currency || 'EUR',
-          itemDetails: amountData.item_details && typeof amountData.item_details === 'string'
+          id: basketData.id,
+          totalAmount: basketData.total_amount || '0',
+          preAuthAmount: basketData.pre_auth_amount || '0',
+          currency: basketData.currency || 'EUR',
+          itemDetails: basketData.item_details && typeof basketData.item_details === 'string'
             ? (() => {
                 try {
-                  return JSON.parse(amountData.item_details);
+                  return JSON.parse(basketData.item_details);
                 } catch (error) {
                   console.error('Error parsing item_details:', error);
                   return {};
                 }
               })()
-            : amountData.item_details || {},
-          requestInfoId: amountData.request_info_id || null,
-          createdAt: amountData.created_at || '',
+            : basketData.item_details || {},
+          requestInfoId: basketData.request_info_id || null,
+          createdAt: basketData.created_at || '',
           saleItems: saleItemsResult.rows.map(item => ({
             itemId: item.item_id || '',
             buttonLabel: item.button_label || '',
@@ -685,16 +663,17 @@ const setupRoutes = (app) => {
             saleChannel: item.sale_channel || '',
             rebateLabel: item.rebate_label || '',
             addProdInfo: item.add_prod_info || '',
+            pumpId: item.pump_id || '',
             isSelected: true,
             createdAt: item.created_at || '',
           })),
         };
         res.status(200).json(responseData);
       } else {
-        res.status(404).json({ message: 'No amount data found for this request ID' });
+        res.status(404).json({ message: 'No basket data found for this request ID' });
       }
     } catch (error) {
-      console.error('Erreur lors de la récupération des données de amount_data pour request ID:', error);
+      console.error('Erreur lors de la récupération des données de basket_data pour request ID:', error);
       res.status(500).json({ message: 'Internal server error', error: error.message });
     }
   });
@@ -722,6 +701,7 @@ const setupRoutes = (app) => {
           saleChannel: item.sale_channel || '',
           rebateLabel: item.rebate_label || '',
           addProdInfo: item.add_prod_info || '',
+          pumpId: item.pump_id || '',
           isSelected: true,
           createdAt: item.created_at || '',
         }));
@@ -739,7 +719,7 @@ const setupRoutes = (app) => {
     try {
       const { id } = req.params;
       const result = await pool.query(
-        `SELECT total_amount FROM amount_data
+        `SELECT total_amount FROM basket_data
          WHERE request_info_id = $1
          ORDER BY created_at DESC LIMIT 1`,
         [id]
@@ -755,34 +735,34 @@ const setupRoutes = (app) => {
     }
   });
 
-  app.get('/amount-data', async (req, res) => {
+  app.get('/basket', async (req, res) => {
     try {
-      const result = await pool.query('SELECT * FROM amount_data LIMIT 1');
-      const amountData = result.rows[0];
-      if (amountData) {
+      const result = await pool.query('SELECT * FROM basket_data LIMIT 1');
+      const basketData = result.rows[0];
+      if (basketData) {
         const saleItems = await pool.query(
           `SELECT si.*, p.name as button_label, p.unit_price, p.unit_measure, p.tax_code 
            FROM sale_items si 
            LEFT JOIN products p ON si.product_code = p.product_code 
-           WHERE si.amount_data_id = $1 ORDER BY si.id`, 
-          [amountData.id]
+           WHERE si.basket_data_id = $1 ORDER BY si.id`, 
+          [basketData.id]
         );
         res.json({
-          id: amountData.id,
-          totalAmount: amountData.total_amount || '0',
-          preAuthAmount: amountData.pre_auth_amount || '',
-          currency: amountData.currency || 'EUR',
+          id: basketData.id,
+          totalAmount: basketData.total_amount || '0',
+          preAuthAmount: basketData.pre_auth_amount || '',
+          currency: basketData.currency || 'EUR',
           saleItems: saleItems.rows.map(transformSaleItem),
-          itemDetails: amountData.item_details && typeof amountData.item_details === 'string'
+          itemDetails: basketData.item_details && typeof basketData.item_details === 'string'
             ? (() => {
                 try {
-                  return JSON.parse(amountData.item_details);
+                  return JSON.parse(basketData.item_details);
                 } catch (error) {
                   console.error('Error parsing item_details:', error);
                   return {};
                 }
               })()
-            : amountData.item_details || {},
+            : basketData.item_details || {},
         });
       } else {
         res.json({
@@ -795,7 +775,7 @@ const setupRoutes = (app) => {
         });
       }
     } catch (error) {
-      console.error('Error fetching amountData:', error);
+      console.error('Error fetching basketData:', error);
       res.status(500).json({ error: 'Internal server error', message: error.message });
     }
   });
@@ -806,7 +786,7 @@ const setupRoutes = (app) => {
         `SELECT si.*, p.name as button_label, p.unit_price, p.unit_measure, p.tax_code 
          FROM sale_items si 
          LEFT JOIN products p ON si.product_code = p.product_code 
-         WHERE si.amount_data_id = $1 ORDER BY si.id`, 
+         WHERE si.basket_data_id = $1 ORDER BY si.id`, 
         [req.params.id]
       );
       res.json(result.rows.map(transformSaleItem));
@@ -820,7 +800,7 @@ const setupRoutes = (app) => {
     const item = req.body;
     try {
       const result = await insertWithErrorHandling(
-        'INSERT INTO sale_items (amount_data_id, product_code, amount, quantity, add_prod_code, reverse_sale, sale_channel, rebate_label, add_prod_info, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP) ON CONFLICT (amount_data_id, product_code) DO UPDATE SET amount = $3, quantity = $4, add_prod_code = $5, reverse_sale = $6, sale_channel = $7, rebate_label = $8, add_prod_info = $9, created_at = CURRENT_TIMESTAMP RETURNING *',
+        'INSERT INTO sale_items (basket_data_id, product_code, amount, quantity, add_prod_code, reverse_sale, sale_channel, rebate_label, add_prod_info, pump_id, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP) ON CONFLICT (basket_data_id, product_code) DO UPDATE SET amount = $3, quantity = $4, add_prod_code = $5, reverse_sale = $6, sale_channel = $7, rebate_label = $8, add_prod_info = $9, pump_id = $10, created_at = CURRENT_TIMESTAMP RETURNING *',
         prepareSaleItemValues(item, req.params.id),
         'Sale item updated successfully:'
       );

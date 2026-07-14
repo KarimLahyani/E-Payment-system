@@ -5,7 +5,7 @@ import { Subscription } from 'rxjs';
 import { DisableFieldsService } from '../services/disable-fields.service';
 import { RequestTypeService } from '../services/request-type.service';
 import { defaultRequestData, requestTypes } from '../models/request-info-data.model';
-import { FullRequestData, PosData, AmountData, LoyaltyData, RequestData } from '../models/full-request-data.model';
+import { FullRequestData, PosData, BasketData, LoyaltyData, RequestData } from '../models/full-request-data.model';
 import { MatDialog } from '@angular/material/dialog';
 import { ConfigurationModalComponent } from '../configuration-modal/configuration-modal.component';
 import { ConfigurationService, ConfigurationData } from '../services/configuration.service';
@@ -38,32 +38,18 @@ interface DeviceData {
   cashierTerminal: string;
 }
 
-interface DataRequest {
-  menuAction: string;
-}
-
 const DEFAULT_POS_DATA: PosData = {
   posTimestamp: '',
   languageCode: '',
   cardEntryMode: '',
   shiftNumber: '',
-  terminalBatch: '',
-  statusRequest: '',
-  additionalInfo: '',
-  outdoorPosition: '',
   clerkId: '',
-  clerkLevel: '',
-  serviceLevel: '',
   posName: '',
-  global: false,
   split: false,
-  longFormat: false,
-  unattended: false,
-  waitingCard: false,
-  choicePayKind: false
+  unattended: false
 };
 
-const DEFAULT_AMOUNT_DATA: AmountData = {
+const DEFAULT_BASKET_DATA: BasketData = {
   totalAmount: '',
   preAuthAmount: '',
   currency: 'EUR',
@@ -109,10 +95,6 @@ const DEFAULT_DEVICE_DATA: DeviceData = {
   cashierTerminal: ''
 };
 
-const DEFAULT_DATA_REQUEST: DataRequest = {
-  menuAction: ''
-};
-
 @Component({
   selector: 'app-request-info',
   templateUrl: './request-info.component.html',
@@ -125,12 +107,12 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
   subscription: Subscription | undefined;
   deviceSubscription: Subscription | undefined;
   activeSection: string = 'pos-data';
+  showFailureModal: boolean = false;
 
   posData: PosData = { ...DEFAULT_POS_DATA, posTimestamp: new Date().toISOString().slice(0, 19) };
-  amountData: AmountData = { ...DEFAULT_AMOUNT_DATA };
+  basketData: BasketData = { ...DEFAULT_BASKET_DATA };
   loyaltyData: LoyaltyData = { ...DEFAULT_LOYALTY_DATA };
   deviceData: DeviceData = { ...DEFAULT_DEVICE_DATA };
-  dataRequest: DataRequest = { ...DEFAULT_DATA_REQUEST };
   serviceRequestMessage: string = '';
 
   responseInfo: ResponseInfo | null = null;
@@ -232,7 +214,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
   private initializeSaleItems() {
     this.requestInfoService.getProducts().subscribe(
       (products) => {
-        this.amountData.saleItems = products.map(product => ({
+        this.basketData.saleItems = products.map(product => ({
           productName: product.productName,
           productCode: product.productCode,
           itemAmount: '',
@@ -248,13 +230,13 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
           isSelected: false,
           createdAt: ''
         }));
-        this.requestInfoService.updateData({ amountData: this.amountData });
-        console.log('Successfully initialized sale items from products catalog', this.amountData.saleItems);
+        this.requestInfoService.updateData({ basketData: this.basketData });
+        console.log('Successfully initialized sale items from products catalog', this.basketData.saleItems);
       },
       (error) => {
         console.error('Failed to initialize sale items, falling back to empty list', error);
-        this.amountData.saleItems = [];
-        this.requestInfoService.updateData({ amountData: this.amountData });
+        this.basketData.saleItems = [];
+        this.requestInfoService.updateData({ basketData: this.basketData });
       }
     );
   }
@@ -370,9 +352,20 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
         this.configData = result;
-        console.log('Configuration updated locally:', this.configData);
+        this.requestInfoService.updateData({ configData: this.configData });
+        console.log('Configuration data updated:', this.configData);
       }
     });
+  }
+
+  retryPayment() {
+    this.showFailureModal = false;
+  }
+
+  cancelTransaction() {
+    this.showFailureModal = false;
+    this.resetToInitialState();
+    console.log("Transaction cancelled by cashier.");
   }
 
   sendRequest() {
@@ -384,7 +377,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     const fullRequestData: FullRequestData = {
       requestData: this.requestData,
       posData: this.posData,
-      amountData: this.amountData,
+      basketData: this.basketData,
       loyaltyData: this.loyaltyData,
       configData: this.configData
     };
@@ -470,20 +463,6 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     alert("Champs effacés avec succès !");
   }
 
-  resetDataRequest() {
-    this.dataRequest = { ...DEFAULT_DATA_REQUEST };
-    console.log("Data Request reset");
-  }
-
-  sendDataRequest() {
-    console.log("Data Request envoyé :", this.dataRequest);
-  }
-
-  quitDataRequest() {
-    console.log("Quit Data Request");
-    this.resetDataRequest();
-  }
-
   isBonusButtonEnabled(): boolean {
     return this.requestData.requestType === 'LoyaltyAward' || this.requestData.requestType === 'LoyaltyAwardRefund';
   }
@@ -501,7 +480,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
       const fullRequestData: FullRequestData = {
         requestData: this.requestData,
         posData: this.posData,
-        amountData: this.amountData,
+        basketData: this.basketData,
         loyaltyData: this.loyaltyData,
         configData: this.configData
       };
@@ -567,8 +546,8 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
             this.posData = { ...this.posData, ...(data as FullRequestData).posData };
             hasChanged = true;
           }
-          if ('amountData' in data && JSON.stringify(this.amountData) !== JSON.stringify((data as FullRequestData).amountData)) {
-            this.amountData = { ...this.amountData, ...(data as FullRequestData).amountData };
+          if ('basketData' in data && JSON.stringify(this.basketData) !== JSON.stringify((data as FullRequestData).basketData)) {
+            this.basketData = { ...this.basketData, ...(data as FullRequestData).basketData };
             hasChanged = true;
           }
           if ('loyaltyData' in data && JSON.stringify(this.loyaltyData) !== JSON.stringify((data as FullRequestData).loyaltyData)) {
@@ -616,22 +595,12 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
       languageCode: '',
       cardEntryMode: '',
       shiftNumber: '',
-      terminalBatch: '',
-      statusRequest: '',
-      additionalInfo: '',
-      outdoorPosition: '',
       clerkId: '',
-      clerkLevel: '',
-      serviceLevel: '',
       posName: '',
-      global: false,
       split: false,
-      longFormat: false,
-      unattended: false,
-      waitingCard: false,
-      choicePayKind: false,
+      unattended: false
     };
-    this.amountData = {
+    this.basketData = {
       totalAmount: '',
       preAuthAmount: '',
       currency: 'EUR',
@@ -674,9 +643,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
       printer: '',
       cashierTerminal: ''
     };
-    this.dataRequest = {
-      menuAction: ''
-    };
+    this.showFailureModal = false;
     this.activeResponseRequestId = null;
     this.responseRequestId = null;
     this.currentRequestId = '';
@@ -687,16 +654,16 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
     }
-    this.requestInfoService.updateData({ amountData: this.amountData, loyaltyData: this.loyaltyData, posData: this.posData });
+    this.requestInfoService.updateData({ basketData: this.basketData, loyaltyData: this.loyaltyData, posData: this.posData });
     this.initializeSaleItems();
   }
 
-  isAmountSectionVisible(): boolean {
-    const amountDataRequiredTypes = [
+  isBasketSectionVisible(): boolean {
+    const basketDataRequiredTypes = [
       'CardPayment', 'CardPreAuthorisation', 'PreAuth+Fin.Advice',
       'CardPaymentLoyaltyRedemption', 'LoyaltyAward'
     ];
-    return amountDataRequiredTypes.includes(this.requestData.requestType);
+    return basketDataRequiredTypes.includes(this.requestData.requestType);
   }
 
   isLoyaltySectionVisible(): boolean {
@@ -717,8 +684,8 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     this.deviceData.printer = '';
     this.deviceData.cashierTerminal = '';
 
-    // Check immediately, then every second for up to 30 seconds.
-    const maxWaitTime = 30000;
+    // Check immediately, then every second for up to 120 seconds.
+    const maxWaitTime = 120000;
     const startTime = Date.now();
 
     if (this.pollingInterval) {
@@ -751,6 +718,11 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
       
       this.cdr.detectChanges();
       console.log("Response fully received!");
+
+      const overallResult = data?.cardServiceResponse?.attributes?.overallResult;
+      if (overallResult === 'Failure') {
+        this.showFailureModal = true;
+      }
     };
 
     const pollForResponse = () => {
@@ -780,7 +752,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
         this.isLoading = false;
         this.activeResponseRequestId = null;
         this.cdr.detectChanges();
-        alert("Timeout en attendant la réponse de l'EPS (30s).");
+        alert("Timeout en attendant la réponse de l'EPS (120s).");
       }
     };
 

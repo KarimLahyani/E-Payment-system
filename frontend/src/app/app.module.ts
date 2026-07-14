@@ -5,7 +5,7 @@ import { AppComponent } from './app.component';
 import { RequestInfoComponent } from './request-info/request-info.component';
 import { ResponseInfoComponent } from './response-info/response-info.component';
 import { PosDataComponent } from './pos-data/pos-data.component';
-import { AmountComponent } from './amount/amount.component';
+import { BasketComponent } from './basket/basket.component';
 import { LoyaltyComponent } from './loyalty/loyalty.component';
 import { SaleItemComponent } from './sale-item/sale-item.component';
 import { ConfigurationModalComponent } from './configuration-modal/configuration-modal.component';
@@ -22,7 +22,7 @@ import { CashierTerminalDialogComponent } from './cashier-terminal-dialog/cashie
     RequestInfoComponent,
     ResponseInfoComponent,
     PosDataComponent,
-    AmountComponent,
+    BasketComponent,
     LoyaltyComponent,
     SaleItemComponent,
     ConfigurationModalComponent,

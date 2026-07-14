@@ -3,7 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, BehaviorSubject, of } from 'rxjs';
 import { tap, catchError, finalize } from 'rxjs/operators';
 import { throwError } from 'rxjs';
-import { FullRequestData, AmountData, SaleItem, PosData, LoyaltyData, RequestData } from '../models/full-request-data.model';
+import { FullRequestData, BasketData, SaleItem, PosData, LoyaltyData, RequestData } from '../models/full-request-data.model';
 
 interface RequestInfoResponse {
   message: string;
@@ -62,16 +62,16 @@ export class RequestInfoService {
     return this.http.get<SaleItem[]>(`${this.apiUrl}/products`);
   }
 
-  getAmountDataForRequest(requestId: string): Observable<AmountData | null> {
-    return this.http.get<AmountData>(`${this.apiUrl}/amount-data/by-request/${requestId}`).pipe(
+  getBasketDataForRequest(requestId: string): Observable<BasketData | null> {
+    return this.http.get<BasketData>(`${this.apiUrl}/basket/by-request/${requestId}`).pipe(
       catchError(error => {
-        console.error('Erreur lors de la récupération de amountData pour requestId:', requestId, error);
+        console.error('Erreur lors de la récupération de basketData pour requestId:', requestId, error);
         return of(null);
       })
     );
   }
 
-  saveAmountDataForRequest(requestId: string, amountData: AmountData): Observable<any> {
+  saveBasketDataForRequest(requestId: string, basketData: BasketData): Observable<any> {
     return of({ status: 'success' });
   }
 
@@ -84,22 +84,22 @@ export class RequestInfoService {
     );
   }
 
-  getAmountData(): Observable<AmountData> {
-    return this.http.get<AmountData>(`${this.apiUrl}/amount-data`);
+  getBasketData(): Observable<BasketData> {
+    return this.http.get<BasketData>(`${this.apiUrl}/basket`);
   }
 
-  saveAmountData(amountData: AmountData): Observable<AmountData> {
+  saveBasketData(basketData: BasketData): Observable<BasketData> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
-    return this.http.post<AmountData>(`${this.apiUrl}/amount-data`, amountData, { headers });
+    return this.http.post<BasketData>(`${this.apiUrl}/basket`, basketData, { headers });
   }
 
-  getSaleItems(amountDataId: number): Observable<SaleItem[]> {
-    return this.http.get<SaleItem[]>(`${this.apiUrl}/amount-data/${amountDataId}/sale-items`);
+  getSaleItems(basketDataId: number): Observable<SaleItem[]> {
+    return this.http.get<SaleItem[]>(`${this.apiUrl}/basket/${basketDataId}/sale-items`);
   }
 
-  saveSaleItem(saleItem: SaleItem, amountDataId: number): Observable<SaleItem> {
+  saveSaleItem(saleItem: SaleItem, basketDataId: number): Observable<SaleItem> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
-    return this.http.post<SaleItem>(`${this.apiUrl}/amount-data/${amountDataId}/sale-items`, saleItem, { headers });
+    return this.http.post<SaleItem>(`${this.apiUrl}/basket/${basketDataId}/sale-items`, saleItem, { headers });
   }
 
   getLastSaleItems(): Observable<SaleItem[]> {
@@ -130,8 +130,8 @@ export class RequestInfoService {
     return this.http.get<PosData>(`${this.apiUrl}/last-pos-data`);
   }
 
-  getLastAmountData(): Observable<AmountData> {
-    return this.http.get<AmountData>(`${this.apiUrl}/last-amount`);
+  getLastBasketData(): Observable<BasketData> {
+    return this.http.get<BasketData>(`${this.apiUrl}/latest-basket-data`);
   }
 
   getLastLoyaltyData(): Observable<LoyaltyData> {
@@ -215,44 +215,39 @@ export class RequestInfoService {
         stan: '',
       },
       posData: data.posData || this.currentData?.posData || {
-        posTimestamp: new Date().toISOString().slice(0, 19),
+        posTimestamp: (() => {
+          const now = new Date();
+          const pad = (n: number) => String(n).padStart(2, '0');
+          return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+        })(),
         languageCode: '',
         cardEntryMode: '',
         shiftNumber: '',
-        terminalBatch: '',
-        statusRequest: '',
-        additionalInfo: '',
-        outdoorPosition: '',
         clerkId: '',
-        clerkLevel: '',
-        serviceLevel: '',
         posName: '',
-        global: false,
         split: false,
-        longFormat: false,
-        unattended: false,
-        waitingCard: false,
-        choicePayKind: false,
+        unattended: false
       },
-      amountData: data.amountData || this.currentData?.amountData || {
+      basketData: data.basketData || this.currentData?.basketData || {
         totalAmount: '',
         preAuthAmount: '',
         currency: 'EUR',
-        saleItems: Array.from({ length: 35 }, (_, i) => ({
-          productName: `Item${i + 1}`,
-          productCode: '',
-          itemAmount: '',
-          quantity: '',
-          taxCode: '',
-          addProdCode: '',
-          reverseSale: '',
-          unitPrice: '',
-          unitMeasure: '',
-          saleChannel: '',
-          rebateLabel: '',
-          addProdInfo: '',
-          isSelected: false,
-          createdAt: '',
+        saleItems: (this.currentData?.basketData?.saleItems || []).map(item => ({
+          ...item,
+          productName: item.productName || '',
+          productCode: item.productCode || '',
+          itemAmount: item.itemAmount || '',
+          quantity: item.quantity || '',
+          taxCode: item.taxCode || '',
+          addProdCode: item.addProdCode || '',
+          reverseSale: item.reverseSale || '',
+          unitPrice: item.unitPrice || '',
+          unitMeasure: item.unitMeasure || '',
+          saleChannel: item.saleChannel || '',
+          rebateLabel: item.rebateLabel || '',
+          addProdInfo: item.addProdInfo || '',
+          isSelected: item.isSelected !== undefined ? item.isSelected : false,
+          createdAt: item.createdAt || '',
         })),
         itemDetails: {
           productName: '',
@@ -310,14 +305,14 @@ export class RequestInfoService {
     } else {
       const requestChanged = data.requestData ? JSON.stringify(this.currentData.requestData) !== JSON.stringify(data.requestData) : false;
       const posChanged = data.posData ? JSON.stringify(this.currentData.posData) !== JSON.stringify(data.posData) : false;
-      const amountChanged = data.amountData ? JSON.stringify(this.currentData.amountData) !== JSON.stringify(data.amountData) : false;
+      const basketChanged = data.basketData ? JSON.stringify(this.currentData.basketData) !== JSON.stringify(data.basketData) : false;
       const loyaltyChanged = data.loyaltyData ? JSON.stringify(this.currentData.loyaltyData) !== JSON.stringify(data.loyaltyData) : false;
       const configChanged = data.configData ? JSON.stringify(this.currentData.configData) !== JSON.stringify(data.configData) : false;
-      hasChanged = requestChanged || posChanged || amountChanged || loyaltyChanged || configChanged;
+      hasChanged = requestChanged || posChanged || basketChanged || loyaltyChanged || configChanged;
       console.log('Comparaison des données:', {
         requestChanged,
         posChanged,
-        amountChanged,
+        basketChanged,
         loyaltyChanged,
         configChanged,
         hasChanged

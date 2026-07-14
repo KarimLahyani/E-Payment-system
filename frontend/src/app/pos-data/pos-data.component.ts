@@ -13,23 +13,13 @@ import { FullRequestData, PosData } from '../models/full-request-data.model';
 export class PosDataComponent implements OnInit, OnDestroy {
   posData: PosData = {
     posTimestamp: '',
-    languageCode: '',
-    cardEntryMode: '',
-    shiftNumber: '',
-    terminalBatch: '',
-    statusRequest: '',
-    additionalInfo: '',
-    outdoorPosition: '',
-    clerkId: '',
-    clerkLevel: '',
-    serviceLevel: '',
-    posName: '',
-    global: false,
+    languageCode: 'EN',
+    cardEntryMode: 'Physical Card',
+    shiftNumber: '1',
+    clerkId: '9999',
+    posName: 'POS-01',
     split: false,
-    longFormat: false,
-    unattended: false,
-    waitingCard: false,
-    choicePayKind: false
+    unattended: false
   };
 
   posDataDisabledFields: { [key: string]: boolean } = {};
@@ -62,7 +52,12 @@ export class PosDataComponent implements OnInit, OnDestroy {
   loadLastPosData() {
     this.requestInfoService.getLastPosData().subscribe(
       (data: PosData) => {
-        this.posData = { ...this.posData, ...data };
+        this.posData = { 
+          ...this.posData, 
+          ...data,
+          languageCode: data.languageCode || 'EN',
+          cardEntryMode: data.cardEntryMode || 'Physical Card'
+        };
         console.log('Dernières données POS Data chargées:', this.posData);
         this.updatePOSData();
         this.cdr.detectChanges();
@@ -87,13 +82,15 @@ export class PosDataComponent implements OnInit, OnDestroy {
   }
 
   private startTimestampUpdate() {
-    this.posData.posTimestamp = new Date().toISOString().slice(0, 19);
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    this.posData.posTimestamp = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
     this.updatePOSData();
-    this.timestampInterval = setInterval(() => {
-      this.posData.posTimestamp = new Date().toISOString().slice(0, 19);
-      this.updatePOSData();
-      console.log("Updated posTimestamp:", this.posData.posTimestamp);
-    }, 1000);
   }
 
   private subscribeToRequestType() {
@@ -122,7 +119,13 @@ export class PosDataComponent implements OnInit, OnDestroy {
             return;
           }
           if ('posData' in data) {
-            this.posData = { ...this.posData, ...(data as FullRequestData).posData };
+            const incoming = (data as FullRequestData).posData;
+            this.posData = { 
+              ...this.posData, 
+              ...incoming,
+              languageCode: incoming.languageCode || 'EN',
+              cardEntryMode: incoming.cardEntryMode || 'Physical Card'
+            };
             if (!(data as FullRequestData).posData.posTimestamp) {
               this.startTimestampUpdate();
             }
@@ -136,23 +139,13 @@ export class PosDataComponent implements OnInit, OnDestroy {
   private resetPosData() {
     this.posData = {
       posTimestamp: '',
-      languageCode: '',
-      cardEntryMode: '',
-      shiftNumber: '',
-      terminalBatch: '',
-      statusRequest: '',
-      additionalInfo: '',
-      outdoorPosition: '',
-      clerkId: '',
-      clerkLevel: '',
-      serviceLevel: '',
-      posName: '',
-      global: false,
+      languageCode: 'EN',
+      cardEntryMode: 'Physical Card',
+      shiftNumber: '1',
+      clerkId: '9999',
+      posName: 'POS-01',
       split: false,
-      longFormat: false,
-      unattended: false,
-      waitingCard: false,
-      choicePayKind: false
+      unattended: false
     };
     this.startTimestampUpdate();
     console.log('PosDataComponent fully reset, posData:', this.posData);

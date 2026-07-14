@@ -72,9 +72,6 @@ export class SaleItemComponent {
       case 'saleChannel':
         this.saleItem.saleChannel = validatedValue;
         break;
-      case 'rebateLabel':
-        this.saleItem.rebateLabel = validatedValue;
-        break;
       case 'addProdInfo':
         this.saleItem.addProdInfo = validatedValue;
         break;
@@ -97,6 +94,17 @@ export class SaleItemComponent {
       this.saleItem.quantity = (currentQty - 1).toString();
       this.onFieldChange('quantity', this.saleItem.quantity);
     }
+  }
+
+  get taxPercentage(): string {
+    const multipliers: { [key: string]: number } = {
+      'A': 20,
+      'B': 10,
+      'C': 15,
+      'D': 5
+    };
+    const rate = multipliers[this.saleItem.taxCode] || 0;
+    return rate > 0 ? `(${rate}%)` : '';
   }
 
   private calculateAmount() {

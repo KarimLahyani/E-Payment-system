@@ -82,6 +82,11 @@
     if (xmlMessage.includes('CardServiceRequest')) {
       const amountMatch = xmlMessage.match(/<TotalAmount[^>]*>([\d\.]+)<\/TotalAmount>/);
       const amount = amountMatch ? parseFloat(amountMatch[1]) : 0;
+      const isManual = xmlMessage.includes('CardEntryMode="Typed Card Number"');
+      const languageMatch = xmlMessage.match(/LanguageCode="([^"]+)"/i);
+      const languageCode = languageMatch ? languageMatch[1].toUpperCase() : 'EN';
+      const reqIdMatch = xmlMessage.match(/RequestID="([^"]+)"/);
+      const requestId = reqIdMatch ? reqIdMatch[1] : correlationId();
       
       const items = [];
       const itemRegex = /<SaleItem[^>]*>([\s\S]*?)<\/SaleItem>/g;
@@ -94,12 +99,14 @@
         const unitPrice = parseFloat((itemXml.match(/<UnitPrice[^>]*>([\d\.]+)<\/UnitPrice>/) || [])[1] || 0);
         const unitMeasure = (itemXml.match(/<UnitMeasure[^>]*>([^<]+)<\/UnitMeasure>/) || [])[1] || 'L';
         const itemAmount = parseFloat((itemXml.match(/<ItemAmount[^>]*>([\d\.]+)<\/ItemAmount>/) || [])[1] || (quantity * unitPrice));
+        const pumpId = (itemXml.match(/<OutdoorPosition[^>]*>([^<]+)<\/OutdoorPosition>/) || [])[1] || null;
+        const taxCode = (itemXml.match(/<TaxCode[^>]*>([^<]+)<\/TaxCode>/) || [])[1] || 'A';
         
-        items.push({ productName, productCode, quantity, unitPrice, unitMeasure, itemAmount });
+        items.push({ productName, productCode, quantity, unitPrice, unitMeasure, itemAmount, pumpId, taxCode });
       }
 
       state.transaction = {
-        id: correlationId(),
+        id: requestId,
         type: 'Sale',
         amount,
         currency: 'EUR',
@@ -112,22 +119,30 @@
           itemAmount: amount
         }],
         siteId: "SITE-0142",
-        pumpId: "PUMP-03",
         driverId: "DRV-1008",
         odometer: "125890",
         offline: false,
+        isManual: isManual,
+        languageCode: languageCode,
         startedAt: new Date().toISOString(),
         stan: stan(),
         terminalBatch: terminalBatch()
       };
 
-      state.terminalMode = 'waitingForCard';
+      state.terminalMode = isManual ? 'waitingForManualCard' : 'waitingForCard';
       state.insertedCardId = null;
       state.codeBuffer = '';
-      setResult("Transaction started. Insert the selected card on the terminal.", "");
-      setConnection("Waiting for card");
-      setScreen(["INSERT CARD", `Sale ${formatMoney(amount, 'EUR')}`]);
       state.dbPreview = buildDatabasePreview(null, null);
+
+      if (isManual) {
+        setResult("Manual entry requested. Type card number on the terminal.", "");
+        setConnection("Waiting for manual card");
+        setScreen(["TYPE CARD NUMBER", ""]);
+      } else {
+        setResult("Transaction started. Insert the selected card on the terminal.", "");
+        setConnection("Waiting for card");
+        setScreen(["INSERT CARD", `Sale ${formatMoney(amount, 'EUR')}`]);
+      }
       render();
     }
   });
@@ -183,10 +198,15 @@
     const card = selectedCard();
     el.insertCardBtn.disabled = state.terminalMode !== "waitingForCard" || !card;
     el.removeCardBtn.disabled = !state.insertedCardId;
-    el.pinOutput.textContent = `Code: ${state.codeBuffer ? "*".repeat(state.codeBuffer.length) : "----"}`;
+    
+    if (state.terminalMode === "waitingForManualCard") {
+      el.pinOutput.textContent = `Card: ${state.codeBuffer || "----"}`;
+    } else {
+      el.pinOutput.textContent = `Code: ${state.codeBuffer ? "*".repeat(state.codeBuffer.length) : "----"}`;
+    }
 
     el.terminalLed.className = "led";
-    if (["waitingForCard", "waitingForCode"].includes(state.terminalMode)) {
+    if (["waitingForCard", "waitingForCode", "waitingForManualCard"].includes(state.terminalMode)) {
       el.terminalLed.classList.add("ready");
     } else if (["processing", "cardInserted"].includes(state.terminalMode)) {
       el.terminalLed.classList.add("busy");
@@ -345,28 +365,104 @@
 
   function handlePinpad(event) {
     const target = event.target.closest("button");
-    if (!target || state.terminalMode !== "waitingForCode") return;
+    if (!target || !["waitingForCode", "waitingForManualCard"].includes(state.terminalMode)) return;
 
     const action = target.dataset.action;
     if (action === "clear") {
       state.codeBuffer = "";
+      if (state.terminalMode === "waitingForManualCard") {
+        setScreen(["TYPE CARD NUMBER", ""]);
+      }
       renderTerminal();
       return;
     }
 
     if (action === "enter") {
+      if (state.terminalMode === "waitingForManualCard") {
+        if (state.codeBuffer.length === 16) {
+          acceptManualCard();
+        }
+        return;
+      }
       authoriseTransaction();
       return;
     }
 
-    if (/^\d$/.test(target.textContent) && state.codeBuffer.length < 8) {
-      state.codeBuffer += target.textContent;
-      renderTerminal();
+    if (/^\d$/.test(target.textContent)) {
+      if (state.terminalMode === "waitingForCode" && state.codeBuffer.length < 8) {
+        state.codeBuffer += target.textContent;
+        renderTerminal();
+      } else if (state.terminalMode === "waitingForManualCard" && state.codeBuffer.length < 16) {
+        state.codeBuffer += target.textContent;
+        setScreen(["TYPE CARD NUMBER", state.codeBuffer]);
+        renderTerminal();
+      }
     }
   }
 
+  function acceptManualCard() {
+    const pan = state.codeBuffer;
+    state.terminalMode = "waitingForCode";
+    state.codeBuffer = "";
+    
+    const matchedCard = state.cards.find(c => c.number === pan);
+    
+    if (matchedCard) {
+      state.insertedCardId = matchedCard.id;
+      setConnection("Manual Card Entered");
+      setScreen(["ENTER CODE", `${matchedCard.name} **** ${pan.slice(-4)}`]);
+      
+      send("TERM->APP", 0, "CardRequest", {
+        requestType: "CardData",
+        token: `T${pan}`,
+        maskedPan: `${pan.slice(0, 6)}******${pan.slice(-4)}`,
+        expiry: matchedCard.expiry,
+        business: matchedCard.name,
+        scheme: "BusinessCard"
+      });
+    } else {
+      state.insertedCardId = "manual"; 
+      state.manualPan = pan;
+      setConnection("Manual Card Entered");
+      setScreen(["ENTER CODE", `Manual **** ${pan.slice(-4)}`]);
+      
+      send("TERM->APP", 0, "CardRequest", {
+        requestType: "CardData",
+        token: `T${pan}`,
+        maskedPan: `${pan.slice(0, 6)}******${pan.slice(-4)}`,
+        expiry: "2099-12",
+        business: "Manual Card",
+        scheme: "BusinessCard"
+      });
+    }
+
+    send("APP->TERM", 0, "CardResponse", {
+      result: "CardAcceptedForProcessing",
+      cardToken: `T${pan}`
+    });
+    send("TERM->APP", 1, "DeviceRequest", {
+      device: "CashierDisplay",
+      command: "Prompt",
+      text: "Enter driver code"
+    });
+    render();
+  }
+
   function authoriseTransaction() {
-    const card = insertedCard();
+    let card;
+    if (state.insertedCardId === "manual") {
+      card = {
+        name: "Manual Card",
+        status: "ACTIVE",
+        passcode: "1234",
+        balance: 999999,
+        currency: "EUR",
+        number: state.manualPan || "0000000000000000",
+        expiry: "2099-12"
+      };
+    } else {
+      card = insertedCard();
+    }
     if (!card || !state.transaction) return;
 
     state.terminalMode = "processing";
@@ -500,7 +596,12 @@
   function buildIfsfXml(direction, channel, type, payload) {
     const root = direction === "APP->TERM" ? "POSMessage" : "EPSMessage";
     const body = objectToXml(type, payload, 2);
-    return `<${root} protocol="IFSF-POS-EPS-style" channel="${channel}" created="${escapeXml(new Date().toISOString())}">
+    
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const localIsoStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    
+    return `<${root} protocol="IFSF-POS-EPS-style" channel="${channel}" created="${escapeXml(localIsoStr)}">
   <Header>
     <MessageType>${escapeXml(type)}</MessageType>
     <CorrelationId>${escapeXml(state.transaction ? state.transaction.id : correlationId())}</CorrelationId>
@@ -608,9 +709,8 @@ ${indent}</${name}>`;
         return " ".repeat(leftPadding) + str;
       };
 
-        const leftPart = `PUMP: ${transaction.pumpId}`;
-        const rightPart = `TRANS: ${stanStr}`;
-        const spaces = 40 - leftPart.length - rightPart.length;
+        const rightPart = `TRANS: ${transaction.id || stanStr}`;
+        const spaces = 40 - rightPart.length;
         
         const lines = [
           center("IFSF STATION"),
@@ -618,40 +718,79 @@ ${indent}</${name}>`;
           center(`STATION #${transaction.siteId}`),
           divider,
           center(dateStr),
-          leftPart + " ".repeat(Math.max(1, spaces)) + rightPart,
+          " ".repeat(Math.max(1, spaces)) + rightPart,
           divider
         ];
+        
+        const isFr = transaction.languageCode === 'FR';
+        const lblSubtotal = isFr ? "SOUS-TOTAL" : "SUBTOTAL";
+        const lblTax = isFr ? "TVA" : "TAX";
+        const lblTotal = "TOTAL";
+        const lblCard = isFr ? "CARTE:" : "CARD:";
+        const lblName = isFr ? "NOM:" : "NAME:";
+        const lblAuth = "AUTH:";
+        const lblStatus = isFr ? "STATUT:" : "STATUS:";
+        const lblEntry = isFr ? "SAISIE:" : "ENTRY:";
+        const entryVal = transaction.isManual ? (isFr ? "MANUELLE" : "TYPED") : (isFr ? "PHYSIQUE" : "PHYSICAL");
+        const msgThanks = isFr ? "MERCI DE VOTRE VISITE" : "THANK YOU FOR YOUR VISIT";
     
-    let subtotal = 0;
+    const taxMultipliers = {
+      'A': 0.20, // 20%
+      'B': 0.10, // 10%
+      'C': 0.15, // 15%
+      'D': 0.05
+    };
+
+    let totalGross = 0;
+    let totalTax = 0;
     if (transaction.items && transaction.items.length > 0) {
       transaction.items.forEach(item => {
         const qtyStr = parseFloat(item.quantity || 1).toFixed(2);
         const unitPriceStr = parseFloat(item.unitPrice || 0).toFixed(3);
         const itemAmt = parseFloat(item.itemAmount || (item.quantity * item.unitPrice));
-        subtotal += itemAmt;
+        
+        const taxCode = item.taxCode || 'A';
+        const taxRate = taxMultipliers[taxCode] || 0;
+        const taxAmt = itemAmt - (itemAmt / (1 + taxRate));
+        
+        totalGross += itemAmt;
+        totalTax += taxAmt;
+        
         const itemAmtStr = itemAmt.toFixed(2);
         
-        lines.push(`${qtyStr}x ${item.productName.toUpperCase()}`);
+        const pumpStr = item.pumpId ? ` (PUMP: ${item.pumpId})` : '';
+        lines.push(`${qtyStr}x ${item.productName.toUpperCase()}${pumpStr}`);
         const priceLine = `${unitPriceStr} ${transaction.currency}/${item.unitMeasure}`;
         const amountPadding = 40 - priceLine.length - itemAmtStr.length;
         lines.push(priceLine + " ".repeat(Math.max(1, amountPadding)) + itemAmtStr);
+        
+        if (taxRate > 0) {
+          const taxPercentStr = (taxRate * 100).toFixed(0) + '%';
+          const lblTaxItem = isFr ? `  TVA (${taxPercentStr}):` : `  TAX (${taxPercentStr}):`;
+          const taxAmtStr = taxAmt.toFixed(2);
+          lines.push(lblTaxItem + " ".repeat(40 - lblTaxItem.length - taxAmtStr.length) + taxAmtStr);
+        }
         lines.push("");
       });
     }
     
-    const subtotalStr = subtotal.toFixed(2);
-    lines.push("SUBTOTAL" + " ".repeat(40 - 8 - subtotalStr.length) + subtotalStr);
-    lines.push("TAX" + " ".repeat(40 - 3 - 4) + "0.00");
-    lines.push("TOTAL" + " ".repeat(40 - 5 - amountStr.length) + amountStr);
+    const subtotalNet = totalGross - totalTax;
+    const subtotalStr = subtotalNet.toFixed(2);
+    const taxStr = totalTax.toFixed(2);
+    
+    lines.push(lblSubtotal + " ".repeat(40 - lblSubtotal.length - subtotalStr.length) + subtotalStr);
+    lines.push(lblTax + " ".repeat(40 - lblTax.length - taxStr.length) + taxStr);
+    lines.push(lblTotal + " ".repeat(40 - lblTotal.length - amountStr.length) + amountStr);
     lines.push(divider);
-    lines.push("CARD:" + " ".repeat(40 - 5 - 9) + `**** ${card.number.slice(-4)}`);
-    lines.push("NAME:" + " ".repeat(40 - 5 - card.name.length) + card.name.toUpperCase());
+    lines.push(lblCard + " ".repeat(40 - lblCard.length - 9) + `**** ${card.number.slice(-4)}`);
+    lines.push(lblName + " ".repeat(40 - lblName.length - card.name.length) + card.name.toUpperCase());
     const authCode = decision.authCode || 'N/A';
-    lines.push("AUTH:" + " ".repeat(40 - 5 - authCode.length) + authCode);
+    lines.push(lblAuth + " ".repeat(40 - lblAuth.length - authCode.length) + authCode);
+    lines.push(lblEntry + " ".repeat(40 - lblEntry.length - entryVal.length) + entryVal);
     const reason = decision.reason.toUpperCase();
-    lines.push("STATUS:" + " ".repeat(40 - 7 - reason.length) + reason);
+    lines.push(lblStatus + " ".repeat(40 - lblStatus.length - reason.length) + reason);
       lines.push("");
-      lines.push(center("THANK YOU FOR YOUR VISIT"));
+      lines.push(center(msgThanks));
     
     return lines.join("\n");
   }

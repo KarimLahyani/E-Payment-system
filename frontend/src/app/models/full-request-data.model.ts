@@ -19,20 +19,10 @@ export interface PosData {
   languageCode: string;
   cardEntryMode: string;
   shiftNumber: string;
-  terminalBatch: string;
-  statusRequest: string;
-  additionalInfo: string;
-  outdoorPosition: string;
   clerkId: string;
-  clerkLevel: string;
-  serviceLevel: string;
   posName: string;
-  global: boolean;
   split: boolean;
-  longFormat: boolean;
   unattended: boolean;
-  waitingCard: boolean;
-  choicePayKind: boolean;
 }
 
 export interface SaleItem {
@@ -48,11 +38,12 @@ export interface SaleItem {
   saleChannel: string;
   rebateLabel: string;
   addProdInfo: string;
-  isSelected: boolean;
+  pumpId?: string; // Ajouté pour le numéro de pompe
+  isSelected: boolean; // Retained for frontend UI toggling
   createdAt?: string;
 }
 
-export interface AmountData {
+export interface BasketData {
   totalAmount: string;
   preAuthAmount: string;
   currency: string;
@@ -80,7 +71,7 @@ export interface LoyaltyData {
 export interface FullRequestData {
   requestData: RequestData;
   posData: PosData;
-  amountData: AmountData;
+  basketData: BasketData;
   loyaltyData: LoyaltyData;
   configData?: ConfigurationData; // Ajouté pour inclure les configurations
 }
