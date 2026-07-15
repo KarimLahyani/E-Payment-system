@@ -26,7 +26,7 @@ async function handleLoyaltyAwardRefund(stan, currentRequestId) {
     const originalAmountDataId = highestAmountData.id;
     const originalTotalAmount = highestAmountData.total_amount;
     const preAuthAmount = highestAmountData.pre_auth_amount || '';
-    const currency = highestAmountData.currency || 'EUR';
+    const currency = highestAmountData.currency || 'TND';
     const itemDetails = highestAmountData.item_details || {};
     console.log(`Highest total_amount found: ${originalTotalAmount} with amount_data.id: ${originalAmountDataId}`);
 

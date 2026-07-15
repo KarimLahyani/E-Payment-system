@@ -270,6 +270,7 @@ const processCardServiceResponse = async (responseXML) => {
     console.log('Full cardServiceResponse object:', JSON.stringify(cardServiceResponse, null, 2));
 
     const overallResult = cardServiceResponse['$']?.OverallResult || 'Unknown';
+    const errorCondition = cardServiceResponse['$']?.ErrorCondition || null;
     const requestType = cardServiceResponse['$']?.RequestType || 'Unknown';
     requestId = cardServiceResponse['$']?.RequestID || '0';
     const stan = cardServiceResponse.Terminal?.['$']?.STAN || cardServiceResponse.Terminal?.STAN || null;
@@ -283,8 +284,8 @@ const processCardServiceResponse = async (responseXML) => {
     } else {
       totalAmount = totalAmount.toString().trim();
     }
-    const tenderCurrency = rawTotalAmount?.['$']?.Currency || 'EUR';
-    const currencyLogos = { EUR: '€', USD: '$', GBP: '£' };
+    const tenderCurrency = rawTotalAmount?.['$']?.Currency || 'TND';
+    const currencyLogos = { EUR: '€', USD: '$', GBP: '£', TND: 'TND' };
     const currencyLogo = currencyLogos[tenderCurrency] || tenderCurrency;
     if (totalAmount !== '0') {
       totalAmount = `${totalAmount} ${currencyLogo}`;
@@ -292,12 +293,12 @@ const processCardServiceResponse = async (responseXML) => {
     console.log(`Extracted totalAmount: ${totalAmount}, Raw TotalAmount object: ${JSON.stringify(cardServiceResponse.Tender?.TotalAmount)}`);
 
     // Insérer ou mettre à jour response_info
-    await pool.query(
-      `INSERT INTO response_info (id, request_type, overall_result, stan, terminal_id, terminal_batch, amount, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+    const resultQuery = await pool.query(
+      `INSERT INTO response_info (id, request_type, overall_result, error_condition, stan, terminal_id, terminal_batch, amount, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
        ON CONFLICT (id) DO UPDATE 
-       SET request_type = $2, overall_result = $3, stan = $4, terminal_id = $5, terminal_batch = $6, amount = $7`,
-      [requestId, requestType, overallResult, stan, terminalId, terminalBatch, totalAmount]
+       SET request_type = $2, overall_result = $3, error_condition = $4, stan = $5, terminal_id = $6, terminal_batch = $7, amount = $8`,
+      [requestId, requestType, overallResult, errorCondition, stan, terminalId, terminalBatch, totalAmount]
     );
     console.log(`Successfully inserted CardServiceResponse into response_info: RequestID=${requestId}`);
 
@@ -328,7 +329,7 @@ const processCardServiceResponse = async (responseXML) => {
     const amountDataId = amountResult.rows[0].id;
     const originalTotalAmount = amountResult.rows[0].total_amount;
     const preAuthAmount = amountResult.rows[0].pre_auth_amount || '';
-    const currency = amountResult.rows[0].currency || 'EUR';
+    const currency = amountResult.rows[0].currency || 'TND';
     const itemDetails = amountResult.rows[0].item_details || {};
 
     // Insérer une nouvelle ligne dans amount_data avec le nouveau totalAmount
@@ -450,12 +451,6 @@ const sendMessage = async () => {
     message = await message;
   }
   const messageStr = typeof message === 'string' ? message : message.toString('latin1');
-  
-  // Send via WebSocket to Web-Based IFSF Simulator
-  if (typeof io !== 'undefined' && io) {
-    console.log('Sending message to Web-Based Simulator via WebSocket');
-    io.emit('terminal:request', messageStr);
-  }
 
   // Also send via TCP if needed
   if (client && !client.destroyed) {
@@ -515,6 +510,12 @@ const sendMessage = async () => {
 };
 
 const addMessageToSend = async (message) => {
+  const messageStr = typeof message === 'string' ? message : message.toString('latin1');
+  if (typeof io !== 'undefined' && io) {
+    console.log('Sending message to Web-Based Simulator via WebSocket IMMEDIATELY');
+    io.emit('terminal:request', messageStr);
+  }
+  
   messagesToSend.push(message);
   await sendMessage();
 };
@@ -603,9 +604,12 @@ const clearDeviceMessages = () => {
   lastResponseXML = '';
 };
 
+const getSocketIo = () => io;
+
 module.exports = {
   clearDeviceMessages,
   setSocketIo,
+  getSocketIo,
   server,
   startTcpServer,
   addMessageToSend,

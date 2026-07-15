@@ -52,7 +52,7 @@ const setupRoutes = (app) => {
       const originalBasketDataId = highestBasketData.id;
       const originalTotalAmount = highestBasketData.total_amount;
       const preAuthAmount = highestBasketData.pre_auth_amount || '';
-      const currency = highestBasketData.currency || 'EUR';
+      const currency = highestBasketData.currency || 'TND';
       
       console.log(`Highest total_amount found: ${originalTotalAmount} with basket_data.id: ${originalBasketDataId}`);
 
@@ -292,7 +292,7 @@ const setupRoutes = (app) => {
         try {
           const basketResult = await pool.query(
             'INSERT INTO basket_data (total_amount, pre_auth_amount, currency, request_info_id) VALUES ($1, $2, $3, $4) RETURNING id',
-            [totalAmount || '0', preAuthAmount || '', currency || 'EUR', requestId]
+            [totalAmount || '0', preAuthAmount || '', currency || 'TND', requestId]
           );
           const basketDataId = basketResult.rows[0].id;
           console.log('Inserted basket_data with id:', basketDataId, 'for request_info_id:', requestId);
@@ -426,6 +426,7 @@ const setupRoutes = (app) => {
             attributes: {
               requestType: responseData.request_type || '',
               overallResult: responseData.overall_result || '',
+              errorCondition: responseData.error_condition || '',
               requestId: responseData.id || '',
             },
             terminal: {
@@ -463,6 +464,7 @@ const setupRoutes = (app) => {
               attributes: {
                 requestType: responseData.request_type || '',
                 overallResult: responseData.overall_result || '',
+                errorCondition: responseData.error_condition || '',
                 requestId: responseData.id || '',
               },
               terminal: {
@@ -573,7 +575,7 @@ const setupRoutes = (app) => {
           id: basketData.id,
           totalAmount: basketData.total_amount || '0',
           preAuthAmount: basketData.pre_auth_amount || '0',
-          currency: basketData.currency || 'EUR',
+          currency: basketData.currency || 'TND',
           itemDetails: basketData.item_details && typeof basketData.item_details === 'string'
             ? (() => {
                 try {
@@ -636,7 +638,7 @@ const setupRoutes = (app) => {
           id: basketData.id,
           totalAmount: basketData.total_amount || '0',
           preAuthAmount: basketData.pre_auth_amount || '0',
-          currency: basketData.currency || 'EUR',
+          currency: basketData.currency || 'TND',
           itemDetails: basketData.item_details && typeof basketData.item_details === 'string'
             ? (() => {
                 try {
@@ -751,7 +753,7 @@ const setupRoutes = (app) => {
           id: basketData.id,
           totalAmount: basketData.total_amount || '0',
           preAuthAmount: basketData.pre_auth_amount || '',
-          currency: basketData.currency || 'EUR',
+          currency: basketData.currency || 'TND',
           saleItems: saleItems.rows.map(transformSaleItem),
           itemDetails: basketData.item_details && typeof basketData.item_details === 'string'
             ? (() => {
@@ -769,7 +771,7 @@ const setupRoutes = (app) => {
           id: 1,
           totalAmount: '0',
           preAuthAmount: '',
-          currency: 'EUR',
+          currency: basketData.currency || 'TND',
           saleItems: generateDefaultSaleItems(),
           itemDetails: {},
         });
@@ -891,12 +893,12 @@ const setupRoutes = (app) => {
 
   app.post('/api/cards/reset', async (req, res) => {
     try {
-      await pool.query('DELETE FROM cards');
+      await pool.query('TRUNCATE TABLE cards RESTART IDENTITY CASCADE');
       
       const seedQuery = `
         INSERT INTO cards (name, number, expiry, passcode, balance, status) VALUES 
-        ('ACME Fleet Diesel', '4532111122229012', '2030-12', '4321', 350.00, 'ACTIVE'),
-        ('Northwind Staff Retail', '4532333344441044', '2029-05', '2468', 180.00, 'ACTIVE'),
+        ('Karim Lahyani', '4532111122229012', '2030-12', '4321', 350.00, 'ACTIVE'),
+        ('John Doe', '4532333344441044', '2029-05', '2468', 180.00, 'ACTIVE'),
         ('Blocked Contractor', '4532555566665520', '2028-09', '1111', 100.00, 'BLOCKED'),
         ('Expired Service Card', '4532777788887780', '2025-01', '9999', 500.00, 'ACTIVE');
       `;
@@ -905,6 +907,38 @@ const setupRoutes = (app) => {
     } catch (error) {
       console.error('Error resetting cards:', error);
       res.status(500).json({ message: 'Error resetting cards' });
+    }
+  });
+
+  app.post('/api/terminal/abort', (req, res) => {
+    try {
+      const { getSocketIo } = require('./tcpHandler');
+      const io = getSocketIo();
+      if (io) {
+        io.emit('terminal:abort');
+        res.status(200).json({ message: 'Terminal abort signal sent' });
+      } else {
+        res.status(500).json({ message: 'Socket.io not initialized' });
+      }
+    } catch (error) {
+      console.error('Error aborting terminal:', error);
+      res.status(500).json({ message: 'Error aborting terminal' });
+    }
+  });
+
+  app.post('/api/terminal/reset', (req, res) => {
+    try {
+      const { getSocketIo } = require('./tcpHandler');
+      const io = getSocketIo();
+      if (io) {
+        io.emit('terminal:reset');
+        res.status(200).json({ message: 'Terminal reset signal sent' });
+      } else {
+        res.status(500).json({ message: 'Socket.io not initialized' });
+      }
+    } catch (error) {
+      console.error('Error resetting terminal:', error);
+      res.status(500).json({ message: 'Error resetting terminal' });
     }
   });
 

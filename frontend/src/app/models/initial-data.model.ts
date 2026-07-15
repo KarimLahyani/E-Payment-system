@@ -30,7 +30,12 @@ export const defaultInitialData = {
   amountData: {
     totalAmount: '',
     preAuthAmount: '',
-    currency: 'EUR',
+    currency: 'TND'
+  },
+  basketData: {
+    totalAmount: '0.00',
+    preAuthAmount: '0.00',
+    currency: 'TND',
     saleItems: [],
     itemDetails: {
       productName: '',

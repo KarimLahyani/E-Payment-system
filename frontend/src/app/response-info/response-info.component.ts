@@ -6,6 +6,7 @@ interface ParsedResponse {
     attributes: {
       requestType: string;
       overallResult: string;
+      errorCondition?: string;
       requestId: string;
     };
     terminal: {

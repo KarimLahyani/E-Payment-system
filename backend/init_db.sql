@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS response_info (
     id INTEGER PRIMARY KEY REFERENCES request_info(id) ON DELETE CASCADE,
     request_type VARCHAR(255),
     overall_result VARCHAR(255),
+    error_condition VARCHAR(255),
     stan VARCHAR(255),
     terminal_id VARCHAR(255),
     terminal_batch VARCHAR(255),
@@ -123,11 +124,11 @@ CREATE TABLE IF NOT EXISTS cards (
 
 -- Seed default cards
 INSERT INTO cards (name, number, expiry, passcode, balance, status)
-SELECT 'ACME Fleet Diesel', '4532111122229012', '2030-12', '4321', 350.00, 'ACTIVE'
+SELECT 'Karim Lahyani', '4532111122229012', '2030-12', '4321', 350.00, 'ACTIVE'
 WHERE NOT EXISTS (SELECT 1 FROM cards WHERE number = '4532111122229012');
 
 INSERT INTO cards (name, number, expiry, passcode, balance, status)
-SELECT 'Northwind Staff Retail', '4532333344441044', '2029-05', '2468', 180.00, 'ACTIVE'
+SELECT 'John Doe', '4532333344441044', '2029-05', '2468', 180.00, 'ACTIVE'
 WHERE NOT EXISTS (SELECT 1 FROM cards WHERE number = '4532333344441044');
 
 INSERT INTO cards (name, number, expiry, passcode, balance, status)

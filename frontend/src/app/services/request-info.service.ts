@@ -126,6 +126,10 @@ export class RequestInfoService {
     );
   }
 
+  abortTransaction(): Observable<any> {
+    return this.http.post(`${this.apiUrl}/api/terminal/abort`, {});
+  }
+
   getLastPosData(): Observable<PosData> {
     return this.http.get<PosData>(`${this.apiUrl}/last-pos-data`);
   }
@@ -231,7 +235,7 @@ export class RequestInfoService {
       basketData: data.basketData || this.currentData?.basketData || {
         totalAmount: '',
         preAuthAmount: '',
-        currency: 'EUR',
+        currency: 'TND',
         saleItems: (this.currentData?.basketData?.saleItems || []).map(item => ({
           ...item,
           productName: item.productName || '',
@@ -394,5 +398,23 @@ export class RequestInfoService {
   notifyGlobalUpdate() {
     this.dataChangeSubject.next(true);
     console.log('Notification globale émise pour rafraîchir tous les composants');
+  }
+
+  resetTerminalSimulator(): Observable<any> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+    return this.http.post<{ message: string }>(`${this.apiUrl}/api/terminal/reset`, {}, { headers }).pipe(
+      tap(response => console.log('Terminal simulator reset signal sent', response)),
+      catchError(error => {
+        console.error('Error resetting terminal simulator:', error);
+        return of(null);
+      })
+    );
+  }
+
+  updateLocalDeviceDisplay(message: string) {
+    this.deviceMessagesSubject.next({
+      ...this.deviceMessagesSubject.value,
+      display: message
+    });
   }
 }

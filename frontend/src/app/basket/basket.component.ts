@@ -18,7 +18,7 @@ export class BasketComponent implements OnInit, OnDestroy {
   basketData: BasketData = {
     totalAmount: '0',
     preAuthAmount: '',
-    currency: 'EUR',
+    currency: 'TND',
     saleItems: [],
     itemDetails: {
       productName: '',
@@ -285,7 +285,7 @@ export class BasketComponent implements OnInit, OnDestroy {
       this.cdr.detectChanges();
       } else if (typeof data === 'object' && data !== null) {
         if (data.refreshRequestId) {
-          this.refreshAfterResponse(data.refreshRequestId);
+          // this.refreshAfterResponse(data.refreshRequestId); // Auto-clear disabled
         }
 
         if (data.basketData) {
@@ -317,6 +317,17 @@ export class BasketComponent implements OnInit, OnDestroy {
               const updatedItem = this.saleItemsList.find(i => i.productName === this.selectedSaleItem?.productName);
               this.selectedSaleItem = updatedItem ? { ...updatedItem } : null;
             }
+            this.updateDisplayedItems();
+          } else if (data.basketData.saleItems && data.basketData.saleItems.length === 0) {
+            // Deselect all items
+            this.saleItemsList = this.saleItemsList.map(item => ({
+              ...item,
+              isSelected: false,
+              quantity: '',
+              itemAmount: ''
+            }));
+            this.basketData.saleItems = [];
+            this.selectedSaleItem = null;
             this.updateDisplayedItems();
           }
           this.updateBasketData();

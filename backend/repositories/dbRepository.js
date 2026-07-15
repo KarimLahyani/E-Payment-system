@@ -71,7 +71,7 @@ async function insertBasketData(basketData, requestId) {
     [
       basketData.totalAmount || '0',
       basketData.preAuthAmount || '',
-      basketData.currency || 'EUR',
+      basketData.currency || 'TND',
       requestId
     ]
   );

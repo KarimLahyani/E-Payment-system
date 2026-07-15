@@ -61,6 +61,9 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
   const requestEnd = `</${rootTag}>`;
 
   let posDataSection = '';
+  const isSplit = posData?.split === true || String(posData?.split).toLowerCase() === 'true';
+  const splitAttr = isSplit ? ` Split="true" BasketTotal="${basketData?.originalTotalAmount || basketData?.totalAmount || '0.00'}"` : '';
+
   if (requestType === 'LoyaltyAward') {
     const languageCode = String(posData?.languageCode || 'de').trim();
     const clerkLevel = String(posData?.clerkLevel || '5').trim();
@@ -72,7 +75,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
     const cardEntryMode = String(posData?.cardEntryMode || '').trim();
     const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
 
-    const posDataLine1 = `    <POSData LanguageCode="${languageCode}" ClerkLevel="${clerkLevel}"${cardEntryAttr}>`;
+    const posDataLine1 = `    <POSData LanguageCode="${languageCode}" ClerkLevel="${clerkLevel}"${cardEntryAttr}${splitAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
     const posDataLine3 = serviceLevel ? `        <ServiceLevel>${serviceLevel}</ServiceLevel>` : '';
     const posDataLine4 = shiftNumber ? `        <ShiftNumber>${shiftNumber}</ShiftNumber>` : '';
@@ -90,7 +93,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
     const cardEntryMode = String(posData?.cardEntryMode || '').trim();
     const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
 
-    const posDataLine1 = `    <POSData LanguageCode="${languageCode}"${cardEntryAttr}>`;
+    const posDataLine1 = `    <POSData LanguageCode="${languageCode}"${cardEntryAttr}${splitAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
     const posDataLine3 = shiftNumber ? `        <ShiftNumber>${shiftNumber}</ShiftNumber>` : '';
     const posDataLine4 = clerkId ? `        <ClerkID>${clerkId}</ClerkID>` : '';
@@ -108,7 +111,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
     const cardEntryMode = String(posData?.cardEntryMode || '').trim();
     const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
 
-    const posDataLine1 = `    <POSData LanguageCode="${languageCode}" ClerkLevel="${clerkLevel}"${track2 ? ` Track2="${track2}"` : ''}${cardEntryAttr}>`;
+    const posDataLine1 = `    <POSData LanguageCode="${languageCode}" ClerkLevel="${clerkLevel}"${track2 ? ` Track2="${track2}"` : ''}${cardEntryAttr}${splitAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
     const posDataLine3 = shiftNumber ? `        <ShiftNumber>${shiftNumber}</ShiftNumber>` : '';
     const posDataLine4 = clerkId ? `        <ClerkID>${clerkId}</ClerkID>` : '';
@@ -128,7 +131,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
     const cardEntryMode = String(posData?.cardEntryMode || '').trim();
     const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
 
-    const posDataLine1 = `    <POSData LanguageCode="${languageCode}" ClerkLevel="${clerkLevel}" Unattended="${unattended}"${cardEntryAttr}>`;
+    const posDataLine1 = `    <POSData LanguageCode="${languageCode}" ClerkLevel="${clerkLevel}" Unattended="${unattended}"${cardEntryAttr}${splitAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
     const posDataLine3 = clerkId ? `        <ClerkID>${clerkId}</ClerkID>` : '';
     
@@ -141,7 +144,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
     const cardEntryMode = String(posData?.cardEntryMode || '').trim();
     const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
 
-    const posDataLine1 = `    <POSData ClerkLevel="${clerkLevel}" LanguageCode="${languageCode}"${cardEntryAttr}>`;
+    const posDataLine1 = `    <POSData ClerkLevel="${clerkLevel}" LanguageCode="${languageCode}"${cardEntryAttr}${splitAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
     const posDataLine3 = `    </POSData>`;
 
@@ -149,7 +152,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
   } else {
     const cardEntryMode = String(posData?.cardEntryMode || '').trim();
     const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
-    const posDataLine1 = `    <POSData${cardEntryAttr}>`;
+    const posDataLine1 = `    <POSData${cardEntryAttr}${splitAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
     const posDataLine3 = `    </POSData>`;
     posDataSection = [posDataLine1, posDataLine2, posDataLine3].filter(line => line).join('\n');
@@ -224,7 +227,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
   let totalAmountSection = '';
   if (requestType === 'LoyaltyAward' || requestType === 'LoyaltyAwardRefund' || requestType === 'PaymentRefundLoyaltyRedemptionRefund' || requestType === 'CardPayment') {
     const totalAmount = formatNumberWithLeadingZeros(basketData?.totalAmount || '0.00', 7, 2);
-    const currency = String(basketData?.currency || 'EUR').trim();
+    const currency = String(basketData?.currency || 'TND').trim();
 
     totalAmountSection = `    <TotalAmount Currency="${currency}">${totalAmount}</TotalAmount>`;
   }

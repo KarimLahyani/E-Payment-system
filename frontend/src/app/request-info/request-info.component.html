@@ -7,36 +7,62 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <!-- Request Information (à gauche) -->
         <div>
-          <div class="flex justify-between items-center mb-4">
-            <h3 class="text-xl font-bold text-center text-gray-900">Request Information</h3>
-            <div class="flex gap-2">
-
-              <!-- Bouton Configuration avec icône -->
-              <button (click)="openConfigurationModal()" class="px-4 py-2 bg-blue-500 text-white rounded-md flex items-center">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+          <!-- Header Row -->
+          <div class="flex flex-wrap items-center justify-between mb-6 gap-4">
+            <h3 class="text-xl font-bold text-gray-900 m-0 translate-y-1.5">Request Information</h3>
+            <div class="flex items-center gap-2">
+              <!-- Bouton Reset -->
+              <button (click)="clearFields()"
+                class="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-md flex items-center transition shadow-sm">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                  </path>
+                </svg>
+                New Transaction
+              </button>
+              <!-- Bouton Configuration avec icne -->
+              <button (click)="openConfigurationModal()"
+                class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-md flex items-center shadow-sm">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4">
+                  </path>
                 </svg>
                 Configuration
               </button>
             </div>
           </div>
-          
+
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <!-- Colonne gauche -->
             <div class="space-y-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Request Type</label>
-                <select [(ngModel)]="requestData.requestType" (ngModelChange)="onRequestTypeChange()" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select [(ngModel)]="requestData.requestType" (ngModelChange)="onRequestTypeChange()"
+                  class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option *ngFor="let type of requestTypes" [value]="type">{{type}}</option>
                 </select>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Ref Number</label>
-                <input type="text" [(ngModel)]="requestData.refNumber" [disabled]="requestInfoDisabledFields['refNumber']" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="text" [(ngModel)]="requestData.refNumber"
+                  [disabled]="requestInfoDisabledFields['refNumber']"
+                  class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">App Sender</label>
-                <input type="text" [(ngModel)]="requestData.appSender" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="text" [(ngModel)]="requestData.appSender"
+                  class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Request ID</label>
+                <div class="flex items-center space-x-2">
+                  <input type="text" [value]="requestData.requestId" disabled
+                    class="flex-1 p-2 border border-gray-300 bg-gray-100 text-gray-500 cursor-not-allowed rounded-md focus:outline-none">
+                </div>
               </div>
             </div>
 
@@ -44,67 +70,106 @@
             <div class="space-y-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">POPID</label>
-                <input type="text" [(ngModel)]="requestData.popId" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="text" [(ngModel)]="requestData.popId"
+                  class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Workstation ID</label>
-                <input type="text" [(ngModel)]="requestData.workstationId" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="text" [(ngModel)]="requestData.workstationId"
+                  class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">STAN</label>
-                <input type="text" [(ngModel)]="requestData.stan" [disabled]="requestData.requestType !== 'LoyaltyAwardRefund'" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Request ID</label>
-                <div class="flex items-center space-x-2">
-                  <input type="text" [value]="requestData.requestId" disabled class="flex-1 p-2 border border-gray-300 bg-gray-100 text-gray-500 cursor-not-allowed rounded-md focus:outline-none">
-                </div>
+                <input type="text" [(ngModel)]="requestData.stan"
+                  [disabled]="requestData.requestType !== 'LoyaltyAwardRefund'"
+                  class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
               </div>
             </div>
           </div>
 
-<!-- Boutons Send, Clear et Bonus -->
-<div class="mt-4 flex justify-center gap-4">
-  <button class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition disabled:opacity-50 disabled:cursor-not-allowed" 
-          [disabled]="isLoading"
-          (click)="sendRequest()">
-    Send
-  </button>
-  <button class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition disabled:opacity-50 disabled:cursor-not-allowed" 
-          [disabled]="isLoading"
-          (click)="clearFields()">
-    Clear
-  </button>
-  <button class="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition disabled:opacity-50 disabled:cursor-not-allowed" 
-          [disabled]="!isBonusButtonEnabled() || isLoading" 
-          (click)="onBonusClick()">
-    Bonus
-  </button>
-</div>
+          <div class="mt-8 space-y-6">
+            <!-- Split Payment Status Indicator -->
+            <div *ngIf="posData.split && paidAmount > 0" class="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between shadow-sm">
+              <div class="flex items-center space-x-4">
+                <div class="text-sm">
+                  <span class="text-gray-500 block mb-1">Basket Total</span>
+                  <span class="font-bold text-gray-800">{{ basketData.totalAmount }} {{ basketData.currency }}</span>
+                </div>
+                <div class="h-8 w-px bg-blue-200"></div>
+                <div class="text-sm">
+                  <span class="text-gray-500 block mb-1">Paid So Far</span>
+                  <span class="font-bold text-green-600">{{ paidAmount | number:'1.2-2' }} {{ basketData.currency }}</span>
+                </div>
+                <div class="h-8 w-px bg-blue-200"></div>
+                <div class="text-sm">
+                  <span class="text-gray-500 block mb-1">Remaining Balance</span>
+                  <span class="font-bold text-blue-700">{{ remainingBalance | number:'1.2-2' }} {{ basketData.currency }}</span>
+                </div>
+              </div>
+              <div class="text-blue-700 font-medium text-sm flex items-center">
+                <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Click SEND for next payment
+              </div>
+            </div>
 
-          <!-- Boutons des sous-sections -->
-          <div class="flex justify-center gap-4 mt-4">
-            <button class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition" (click)="showSubSection('pos-data')">
-              POS Data
-            </button>
-            <button *ngIf="isBasketSectionVisible()" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition" (click)="showSubSection('basket')">
-              Basket
-            </button>
-            <button *ngIf="isLoyaltySectionVisible()" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition" (click)="showSubSection('loyalty')">
-              Loyalty
-            </button>
+            <!-- Action Buttons -->
+            <div class="flex justify-center gap-4 border-b border-gray-200 pb-6">
+              <button
+                class="flex-1 max-w-[120px] px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                [disabled]="isLoading" (click)="sendRequest()">
+                Send
+              </button>
+              <button
+                class="flex-1 max-w-[120px] px-4 py-2.5 bg-gray-500 text-white font-semibold rounded-md shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                [disabled]="isLoading" (click)="clearFields()">
+                Clear
+              </button>
+              <button
+                class="flex-1 max-w-[120px] px-4 py-2.5 bg-red-600 text-white font-semibold rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                (click)="abortTransaction()">
+                Abort
+              </button>
+              <button
+                class="flex-1 max-w-[120px] px-4 py-2.5 bg-green-500 text-white font-semibold rounded-md shadow-sm hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                [disabled]="!isBonusButtonEnabled() || isLoading" (click)="onBonusClick()">
+                Bonus
+              </button>
+            </div>
+
+            <!-- Tabs for sub-sections -->
+            <div class="flex flex-wrap justify-center gap-2">
+              <button class="px-6 py-2 text-sm font-medium rounded-md transition"
+                [ngClass]="activeSection === 'pos-data' ? 'bg-indigo-100 text-indigo-700 border-b-2 border-indigo-600 shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                (click)="showSubSection('pos-data')">
+                POS Data
+              </button>
+              <button *ngIf="isBasketSectionVisible()" class="px-6 py-2 text-sm font-medium rounded-md transition"
+                [ngClass]="activeSection === 'basket' ? 'bg-indigo-100 text-indigo-700 border-b-2 border-indigo-600 shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                (click)="showSubSection('basket')">
+                Basket
+              </button>
+              <button *ngIf="isLoyaltySectionVisible()" class="px-6 py-2 text-sm font-medium rounded-md transition"
+                [ngClass]="activeSection === 'loyalty' ? 'bg-indigo-100 text-indigo-700 border-b-2 border-indigo-600 shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                (click)="showSubSection('loyalty')">
+                Loyalty
+              </button>
+            </div>
           </div>
         </div>
 
         <!-- Response Information (à droite) -->
         <div class="relative h-full flex flex-col">
           <!-- Loading Spinner specifically for Response Information -->
-          <div *ngIf="isLoading" class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gray-50 bg-opacity-95 rounded-xl border-2 border-dashed border-blue-400">
+          <div *ngIf="isLoading"
+            class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gray-50 bg-opacity-95 rounded-xl border-2 border-dashed border-blue-400">
             <div class="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-500 mb-3"></div>
             <p class="text-md font-semibold text-gray-600">Waiting for EPS Response...</p>
           </div>
           <!-- The actual Response Information Component -->
-          <app-response-info class="flex-1" *ngIf="!isLoading" [responseData]="responseInfo" [expectedRequestId]="responseRequestId"></app-response-info>
+          <app-response-info class="flex-1" *ngIf="!isLoading" [responseData]="responseInfo"
+            [expectedRequestId]="responseRequestId"></app-response-info>
         </div>
       </div>
 
@@ -121,49 +186,52 @@
     <div class="new-sections">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- Devices -->
-      
-<div>
-  <h3 class="text-lg font-bold text-gray-900 mb-4">Devices</h3>
-  <div class="space-y-4">
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Display</label>
-      <div class="w-full p-3 border-2 border-gray-400 rounded-md bg-gray-50 text-gray-800 font-mono uppercase tracking-wide text-center whitespace-pre-wrap break-words min-h-[4rem] flex flex-col justify-center shadow-inner">
-        {{ deviceData.display || ' ' }}
-      </div>
-    </div>
+
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Printer Receipt</label>
-          <div class="p-4 bg-white text-gray-900 font-mono text-sm whitespace-pre shadow-md border border-gray-300 mx-auto rounded" style="font-family: 'Courier New', Courier, monospace; letter-spacing: 0px; width: max-content; min-width: 350px; min-height: 15rem;">{{ deviceData.printer || ' ' }}</div>
+          <h3 class="text-lg font-bold text-gray-900 mb-4">Devices</h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Display</label>
+              <div
+                class="w-full p-3 border-2 border-gray-400 rounded-md bg-gray-50 text-gray-800 font-mono uppercase tracking-wide text-center whitespace-pre-wrap break-words min-h-[4rem] flex flex-col justify-center shadow-inner">
+                {{ deviceData.display || ' ' }}
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Printer Receipt</label>
+              <div
+                class="p-4 bg-white text-gray-900 font-mono text-sm whitespace-pre shadow-md border border-gray-300 mx-auto rounded"
+                style="font-family: 'Courier New', Courier, monospace; letter-spacing: 0px; width: max-content; min-width: 350px; min-height: 15rem;">
+                {{ deviceData.printer || ' ' }}</div>
+            </div>
+          </div>
         </div>
-  </div>
-</div>
 
-      </div>
-    </div>
-
-    <!-- Modal pour Ǹchec de paiement -->
-    <div *ngIf="showFailureModal" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-900 bg-opacity-75">
-      <div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center border-4 border-red-500">
-        <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-6">
-          <svg class="h-10 w-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-          </svg>
-        </div>
-        <h3 class="text-2xl font-bold text-gray-900 mb-2">Payment Declined</h3>
-        <p class="text-gray-600 mb-8">The terminal has rejected the payment or it failed to process. What would you like to do?</p>
-        <div class="flex flex-col gap-3">
-          <button class="w-full px-4 py-3 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition" (click)="retryPayment()">
-            Retry Payment (Change Card or Method)
-          </button>
-          <button class="w-full px-4 py-3 bg-gray-200 text-gray-800 rounded-md font-semibold hover:bg-gray-300 transition" (click)="cancelTransaction()">
-            Cancel Transaction
-          </button>
-        </div>
       </div>
     </div>
   </div>
 </div>
 
-
-
-
+<!-- Split Payment Modal -->
+<div *ngIf="showSplitModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+  <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+    <h3 class="text-xl font-bold text-gray-800 mb-4">Split Payment</h3>
+    <p class="text-sm text-gray-600 mb-4">
+      Total Basket: <span class="font-semibold">{{ basketData.totalAmount }} {{ basketData.currency }}</span>
+    </p>
+    <div class="mb-6">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Amount to Charge Now:</label>
+      <input type="number" [(ngModel)]="splitAmountInput" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg">
+    </div>
+    <div class="flex gap-2 mb-6">
+      <button (click)="applySplitPercentage(25)" class="flex-1 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">25%</button>
+      <button (click)="applySplitPercentage(33)" class="flex-1 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">33%</button>
+      <button (click)="applySplitPercentage(50)" class="flex-1 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">50%</button>
+      <button (click)="applySplitPercentage(75)" class="flex-1 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">75%</button>
+    </div>
+    <div class="flex justify-end gap-3">
+      <button (click)="cancelSplit()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400">Cancel</button>
+      <button (click)="confirmSplitAndSend()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Confirm & Send</button>
+    </div>
+  </div>
+</div>

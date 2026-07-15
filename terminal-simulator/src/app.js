@@ -9,7 +9,8 @@
     insertedCardId: null,
     codeBuffer: "",
     messages: [],
-    dbPreview: ""
+    dbPreview: "",
+    splitSession: null
   };
 
   const el = {
@@ -57,6 +58,36 @@
     setConnection('Disconnected');
   });
 
+  socket.on('terminal:reset', () => {
+    resetSimulator();
+  });
+
+  socket.on('terminal:abort', () => {
+    state.splitSession = null;
+    if (state.transaction) {
+      setResult("Transaction aborted by Cashier.", "Failure");
+      setConnection("Aborted");
+      setScreen(["TRANSACTION", "ABORTED"]);
+      
+      const xmlResponse = buildSaleResponse(state.transaction, {
+        overallResult: "Failure",
+        errorCondition: "Aborted",
+        errorReason: "Aborted by Cashier"
+      });
+      socket.emit("terminal:response", xmlResponse);
+
+      send("TERM->APP", 1, "DeviceRequest", {
+        device: "Printer",
+        command: "ReceiptData",
+        text: "\n" + center("TRANSACTION ABORTED") + "\n\n"
+      });
+
+      state.transaction = null;
+      render();
+      setTimeout(resetSimulator, 3000);
+    }
+  });
+
   socket.on('terminal:request', (xmlMessage) => {
     currentRequestXml = xmlMessage;
     
@@ -83,6 +114,9 @@
       const amountMatch = xmlMessage.match(/<TotalAmount[^>]*>([\d\.]+)<\/TotalAmount>/);
       const amount = amountMatch ? parseFloat(amountMatch[1]) : 0;
       const isManual = xmlMessage.includes('CardEntryMode="Typed Card Number"');
+      const isSplit = xmlMessage.includes('Split="true"') || xmlMessage.includes('Split="True"');
+      const basketTotalMatch = xmlMessage.match(/BasketTotal="([^"]+)"/);
+      const parsedBasketTotal = basketTotalMatch ? parseFloat(basketTotalMatch[1]) : amount;
       const languageMatch = xmlMessage.match(/LanguageCode="([^"]+)"/i);
       const languageCode = languageMatch ? languageMatch[1].toUpperCase() : 'EN';
       const reqIdMatch = xmlMessage.match(/RequestID="([^"]+)"/);
@@ -109,7 +143,9 @@
         id: requestId,
         type: 'Sale',
         amount,
-        currency: 'EUR',
+        basketTotal: parsedBasketTotal,
+        currency: 'TND',
+        split: isSplit,
         items: items.length > 0 ? items : [{
           productName: 'Diesel',
           productCode: '102',
@@ -141,14 +177,14 @@
       } else {
         setResult("Transaction started. Insert the selected card on the terminal.", "");
         setConnection("Waiting for card");
-        setScreen(["INSERT CARD", `Sale ${formatMoney(amount, 'EUR')}`]);
+        setScreen(["INSERT CARD", `Sale ${formatMoney(amount, 'TND')}`]);
       }
       render();
     }
   });
 
   function loadCards() {
-    fetch('http://localhost:3000/api/cards')
+    fetch('http://localhost:3000/api/cards', { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         state.cards = data;
@@ -456,7 +492,7 @@
         status: "ACTIVE",
         passcode: "1234",
         balance: 999999,
-        currency: "EUR",
+        currency: "TND",
         number: state.manualPan || "0000000000000000",
         expiry: "2099-12"
       };
@@ -507,8 +543,10 @@
       const popId = currentRequestXml.match(/POPID="([^"]+)"/)?.[1] || "01";
       const workstationId = currentRequestXml.match(/WorkstationID="([^"]+)"/)?.[1] || "POS01";
 
+      const errorAttr = !decision.approved ? ` ErrorCondition="${decision.reason || 'Card Declined'}"` : '';
+
       const finalResponseXml = `<?xml version="1.0" encoding="ISO-8859-1" standalone="no"?>
-<CardServiceResponse ApplicationSender="TerminalSimulator" POPID="${popId}" RequestID="${reqId}" WorkstationID="${workstationId}" RequestType="CardPayment" OverallResult="${decision.approved ? "Success" : "Failure"}" xmlns="http://www.nrf-arts.org/IXRetail/namespace" xmlns:IFSF="http://www.ifsf.org/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.nrf-arts.org/IXRetail/namespace ./IFSF/XSD/CardServiceResponse.xsd">
+<CardServiceResponse ApplicationSender="TerminalSimulator" POPID="${popId}" RequestID="${reqId}" WorkstationID="${workstationId}" RequestType="CardPayment" OverallResult="${decision.approved ? "Success" : "Failure"}"${errorAttr} xmlns="http://www.nrf-arts.org/IXRetail/namespace" xmlns:IFSF="http://www.ifsf.org/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.nrf-arts.org/IXRetail/namespace ./IFSF/XSD/CardServiceResponse.xsd">
   <Terminal>
     <TerminalID>TERM01</TerminalID>
     <STAN>${state.transaction.stan}</STAN>
@@ -522,13 +560,55 @@
   </Card>
 </CardServiceResponse>`;
 
-      socket.emit('terminal:response', finalResponseXml);
-      send("TERM->APP", 1, "DeviceRequest", {
-        device: "Printer",
-        command: "ReceiptData",
-        text: buildReceipt(decision, card, state.transaction)
-      });
-      render();
+        socket.emit('terminal:response', finalResponseXml);
+
+        let shouldPrintReceipt = true;
+        
+        if (decision.approved && state.transaction.split) {
+          if (!state.splitSession || state.splitSession.basketTotal !== state.transaction.basketTotal) {
+            state.splitSession = {
+              basketTotal: state.transaction.basketTotal,
+              paidAmount: 0,
+              payments: []
+            };
+          }
+          
+          const cardKey = `**** ${card.number.slice(-4)}`;
+          const existingPayment = state.splitSession.payments.find(p => p.cardNumber === cardKey);
+          if (existingPayment) {
+            existingPayment.amount += state.transaction.amount;
+          } else {
+            state.splitSession.payments.push({
+              cardName: card.name.toUpperCase(),
+              cardNumber: cardKey,
+              amount: state.transaction.amount
+            });
+          }
+          
+          state.splitSession.paidAmount += state.transaction.amount;
+          
+          if (state.splitSession.paidAmount < state.splitSession.basketTotal) {
+            shouldPrintReceipt = false;
+            setScreen(["APPROVED", "WAITING FOR NEXT PAYMENT..."]);
+          } else {
+            shouldPrintReceipt = true;
+          }
+        }
+
+        if (shouldPrintReceipt) {
+          send("TERM->APP", 1, "DeviceRequest", {
+            device: "Printer",
+            command: "ReceiptData",
+            text: buildReceipt(decision, card, state.transaction)
+          });
+          if (decision.approved && state.splitSession) {
+            state.splitSession = null; // Clear session after final receipt
+          }
+        }
+        render();
+      
+      // Auto-reset back to initial state after 5 seconds
+      window.setTimeout(resetSimulator, 5000);
     }, 650);
   }
 
@@ -709,23 +789,24 @@ ${indent}</${name}>`;
         return " ".repeat(leftPadding) + str;
       };
 
+        const leftPart = dateStr;
         const rightPart = `TRANS: ${transaction.id || stanStr}`;
-        const spaces = 40 - rightPart.length;
+        const spaces = 40 - leftPart.length - rightPart.length;
+        const dateTransLine = leftPart + " ".repeat(Math.max(1, spaces)) + rightPart;
         
         const lines = [
-          center("IFSF STATION"),
-          center("789 HIGHWAY ROUTE 66"),
+          center("STATION SERVICE AGIL"),
+          center("ROUTE DE TUNIS KM 10, SFAX"),
           center(`STATION #${transaction.siteId}`),
           divider,
-          center(dateStr),
-          " ".repeat(Math.max(1, spaces)) + rightPart,
+          dateTransLine,
           divider
         ];
         
         const isFr = transaction.languageCode === 'FR';
-        const lblSubtotal = isFr ? "SOUS-TOTAL" : "SUBTOTAL";
-        const lblTax = isFr ? "TVA" : "TAX";
-        const lblTotal = "TOTAL";
+        const lblSubtotal = isFr ? "SOUS-TOTAL (HT)" : "SUBTOTAL (NET)";
+        const lblTax = isFr ? "TVA" : "TOTAL TAX";
+        const lblTotal = isFr ? "TOTAL (TTC)" : "TOTAL (GROSS)";
         const lblCard = isFr ? "CARTE:" : "CARD:";
         const lblName = isFr ? "NOM:" : "NAME:";
         const lblAuth = "AUTH:";
@@ -751,7 +832,9 @@ ${indent}</${name}>`;
         
         const taxCode = item.taxCode || 'A';
         const taxRate = taxMultipliers[taxCode] || 0;
-        const taxAmt = itemAmt - (itemAmt / (1 + taxRate));
+        
+        let exactTaxAmt = itemAmt - (itemAmt / (1 + taxRate));
+        let taxAmt = Math.round((exactTaxAmt + Number.EPSILON) * 100) / 100;
         
         totalGross += itemAmt;
         totalTax += taxAmt;
@@ -766,7 +849,7 @@ ${indent}</${name}>`;
         
         if (taxRate > 0) {
           const taxPercentStr = (taxRate * 100).toFixed(0) + '%';
-          const lblTaxItem = isFr ? `  TVA (${taxPercentStr}):` : `  TAX (${taxPercentStr}):`;
+          const lblTaxItem = isFr ? `  INCL. TVA (${taxPercentStr}):` : `  INCL. TAX (${taxPercentStr}):`;
           const taxAmtStr = taxAmt.toFixed(2);
           lines.push(lblTaxItem + " ".repeat(40 - lblTaxItem.length - taxAmtStr.length) + taxAmtStr);
         }
@@ -774,21 +857,54 @@ ${indent}</${name}>`;
       });
     }
     
+    // Ensure Subtotal + Tax = TotalGross mathematically
     const subtotalNet = totalGross - totalTax;
     const subtotalStr = subtotalNet.toFixed(2);
     const taxStr = totalTax.toFixed(2);
+    const amountStrFormatted = totalGross.toFixed(2);
     
     lines.push(lblSubtotal + " ".repeat(40 - lblSubtotal.length - subtotalStr.length) + subtotalStr);
     lines.push(lblTax + " ".repeat(40 - lblTax.length - taxStr.length) + taxStr);
-    lines.push(lblTotal + " ".repeat(40 - lblTotal.length - amountStr.length) + amountStr);
-    lines.push(divider);
-    lines.push(lblCard + " ".repeat(40 - lblCard.length - 9) + `**** ${card.number.slice(-4)}`);
-    lines.push(lblName + " ".repeat(40 - lblName.length - card.name.length) + card.name.toUpperCase());
-    const authCode = decision.authCode || 'N/A';
-    lines.push(lblAuth + " ".repeat(40 - lblAuth.length - authCode.length) + authCode);
-    lines.push(lblEntry + " ".repeat(40 - lblEntry.length - entryVal.length) + entryVal);
-    const reason = decision.reason.toUpperCase();
-    lines.push(lblStatus + " ".repeat(40 - lblStatus.length - reason.length) + reason);
+    
+      lines.push(lblTotal + " ".repeat(40 - lblTotal.length - amountStrFormatted.length) + amountStrFormatted);
+      
+      if (transaction.split && state.splitSession && state.splitSession.payments) {
+        lines.push("");
+        const lblPayments = isFr ? "PAIEMENTS:" : "PAYMENTS:";
+        lines.push(lblPayments);
+        
+        state.splitSession.payments.forEach(payment => {
+          const pAmount = parseFloat(payment.amount).toFixed(2);
+          const pCard = `${payment.cardName} (${payment.cardNumber})`;
+          
+          let line = pCard;
+          if (line.length + pAmount.length >= 40) {
+             lines.push(line);
+             lines.push(" ".repeat(40 - pAmount.length) + pAmount);
+          } else {
+             lines.push(line + " ".repeat(40 - line.length - pAmount.length) + pAmount);
+          }
+        });
+        
+        lines.push(divider);
+        // Do not print individual card auth details for consolidated receipt, or print just the last one
+        lines.push(lblCard + " ".repeat(40 - lblCard.length - 9) + `**** ${card.number.slice(-4)}`);
+        lines.push(lblName + " ".repeat(40 - lblName.length - card.name.length) + card.name.toUpperCase());
+        const authCode = decision.authCode || 'N/A';
+        lines.push(lblAuth + " ".repeat(40 - lblAuth.length - authCode.length) + authCode);
+        lines.push(lblEntry + " ".repeat(40 - lblEntry.length - entryVal.length) + entryVal);
+        const reason = decision.reason.toUpperCase();
+        lines.push(lblStatus + " ".repeat(40 - lblStatus.length - reason.length) + reason);
+      } else {
+        lines.push(divider);
+        lines.push(lblCard + " ".repeat(40 - lblCard.length - 9) + `**** ${card.number.slice(-4)}`);
+        lines.push(lblName + " ".repeat(40 - lblName.length - card.name.length) + card.name.toUpperCase());
+        const authCode = decision.authCode || 'N/A';
+        lines.push(lblAuth + " ".repeat(40 - lblAuth.length - authCode.length) + authCode);
+        lines.push(lblEntry + " ".repeat(40 - lblEntry.length - entryVal.length) + entryVal);
+        const reason = decision.reason.toUpperCase();
+        lines.push(lblStatus + " ".repeat(40 - lblStatus.length - reason.length) + reason);
+      }
       lines.push("");
       lines.push(center(msgThanks));
     
@@ -916,7 +1032,7 @@ ${indent}</${name}>`;
   function formatMoney(amount, currency) {
     return new Intl.NumberFormat(undefined, {
       style: "currency",
-      currency: currency || "EUR"
+      currency: currency || "TND"
     }).format(Number(amount || 0));
   }
 

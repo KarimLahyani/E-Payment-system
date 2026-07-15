@@ -35,6 +35,17 @@
           class="w-full p-2 border border-indigo-300 rounded-md bg-white text-indigo-900"
         />
       </div>
+
+      <!-- Request ID -->
+      <div>
+        <label class="block text-sm font-medium text-indigo-800 mb-2">Request ID</label>
+        <input
+          type="text"
+          [value]="response.cardServiceResponse.attributes.requestId || ''"
+          readonly
+          class="w-full p-2 border border-indigo-300 rounded-md bg-white text-indigo-900"
+        />
+      </div>
     </div>
 
     <div class="space-y-6">
@@ -45,7 +56,23 @@
           type="text"
           [value]="response.cardServiceResponse.attributes.overallResult || ''"
           readonly
-          class="w-full p-2 border border-indigo-300 rounded-md bg-white text-indigo-900"
+          class="w-full p-2 border rounded-md font-bold transition-colors duration-300"
+          [ngClass]="{
+            'text-green-700 bg-green-50 border-green-400': response.cardServiceResponse.attributes.overallResult === 'Success',
+            'text-red-700 bg-red-50 border-red-400': response.cardServiceResponse.attributes.overallResult === 'Failure',
+            'bg-white text-indigo-900 border-indigo-300': response.cardServiceResponse.attributes.overallResult !== 'Success' && response.cardServiceResponse.attributes.overallResult !== 'Failure'
+          }"
+        />
+      </div>
+
+      <!-- Error Condition (Only if present) -->
+      <div *ngIf="response.cardServiceResponse.attributes.errorCondition">
+        <label class="block text-sm font-medium text-red-800 mb-2">Error Reason</label>
+        <input
+          type="text"
+          [value]="response.cardServiceResponse.attributes.errorCondition"
+          readonly
+          class="w-full p-2 border border-red-300 rounded-md bg-red-100 text-red-800 font-semibold"
         />
       </div>
 
@@ -66,17 +93,6 @@
         <input
           type="text"
           [value]="response.cardServiceResponse.terminal.terminalBatch || ''"
-          readonly
-          class="w-full p-2 border border-indigo-300 rounded-md bg-white text-indigo-900"
-        />
-      </div>
-
-      <!-- Request ID -->
-      <div>
-        <label class="block text-sm font-medium text-indigo-800 mb-2">Request ID</label>
-        <input
-          type="text"
-          [value]="response.cardServiceResponse.attributes.requestId || ''"
           readonly
           class="w-full p-2 border border-indigo-300 rounded-md bg-white text-indigo-900"
         />

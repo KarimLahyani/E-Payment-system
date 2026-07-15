@@ -17,6 +17,7 @@ interface ResponseInfo {
     attributes: {
       requestType: string;
       overallResult: string;
+      errorCondition?: string;
       requestId: string;
     };
     terminal: {
@@ -52,7 +53,7 @@ const DEFAULT_POS_DATA: PosData = {
 const DEFAULT_BASKET_DATA: BasketData = {
   totalAmount: '',
   preAuthAmount: '',
-  currency: 'EUR',
+  currency: 'TND',
   saleItems: [],
   itemDetails: {
     productName: '',
@@ -90,7 +91,7 @@ const DEFAULT_LOYALTY_DATA: LoyaltyData = {
 };
 
 const DEFAULT_DEVICE_DATA: DeviceData = {
-  display: '',
+  display: 'Welcome to Cashier Simulator',
   printer: '',
   cashierTerminal: ''
 };
@@ -107,7 +108,13 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
   subscription: Subscription | undefined;
   deviceSubscription: Subscription | undefined;
   activeSection: string = 'pos-data';
-  showFailureModal: boolean = false;
+  showSplitModal: boolean = false;
+  splitAmountInput: number = 0;
+  paidAmount: number = 0;
+
+  get remainingBalance(): number {
+    return Math.max(0, parseFloat(this.basketData.totalAmount || '0') - this.paidAmount);
+  }
 
   posData: PosData = { ...DEFAULT_POS_DATA, posTimestamp: new Date().toISOString().slice(0, 19) };
   basketData: BasketData = { ...DEFAULT_BASKET_DATA };
@@ -358,26 +365,52 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     });
   }
 
-  retryPayment() {
-    this.showFailureModal = false;
-  }
-
-  cancelTransaction() {
-    this.showFailureModal = false;
-    this.resetToInitialState();
-    console.log("Transaction cancelled by cashier.");
-  }
-
   sendRequest() {
+    if (this.posData.split) {
+      const total = parseFloat(this.basketData.totalAmount) || 0;
+      const remaining = Math.max(0, total - this.paidAmount);
+      this.splitAmountInput = parseFloat(remaining.toFixed(2));
+      this.showSplitModal = true;
+    } else {
+      this.executeSendRequest();
+    }
+  }
+
+  applySplitPercentage(percent: number) {
+    const total = parseFloat(this.basketData.totalAmount) || 0;
+    const remaining = Math.max(0, total - this.paidAmount);
+    // Suggest a percentage of the *original* total, capped at remaining
+    const suggestion = total * (percent / 100);
+    this.splitAmountInput = parseFloat(Math.min(suggestion, remaining).toFixed(2));
+  }
+
+  cancelSplit() {
+    this.showSplitModal = false;
+  }
+
+  confirmSplitAndSend() {
+    this.showSplitModal = false;
+    this.executeSendRequest(this.splitAmountInput.toFixed(2));
+  }
+
+  executeSendRequest(amountToSend?: string) {
     this.loyaltyData.bonusCard = false;
     console.log('bonusCard réinitialisé à false avant envoi via Send:', this.loyaltyData.bonusCard);
     this.requestInfoService.updateData({ loyaltyData: this.loyaltyData });
     this.prepareForNewResponse();
 
+    // Create a deep copy of basketData to avoid modifying the UI's basket
+    const requestBasketData = JSON.parse(JSON.stringify(this.basketData));
+    // Keep a reference to the real total for split receipts logic
+    requestBasketData.originalTotalAmount = this.basketData.totalAmount;
+    if (amountToSend) {
+      requestBasketData.totalAmount = amountToSend;
+    }
+
     const fullRequestData: FullRequestData = {
       requestData: this.requestData,
       posData: this.posData,
-      basketData: this.basketData,
+      basketData: requestBasketData,
       loyaltyData: this.loyaltyData,
       configData: this.configData
     };
@@ -395,7 +428,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
           this.responseRequestId = sentRequestId;
           this.requestInfoService.updateData({ requestData: this.requestData });
           console.log('Updated requestData.requestId to:', this.requestData.requestId);
-          this.startPollingForResponse(sentRequestId);
+          this.startPollingForResponse(sentRequestId, amountToSend);
         } else {
           this.isLoading = false;
           this.activeResponseRequestId = null;
@@ -451,16 +484,27 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     this.router.navigate([`/request-info/${section}`]);
   }
 
+  abortTransaction() {
+    this.requestInfoService.abortTransaction().subscribe({
+      next: () => {
+        console.log("Transaction aborted successfully");
+        if (this.pollingInterval) {
+          clearInterval(this.pollingInterval);
+          this.pollingInterval = null;
+        }
+        this.isLoading = false;
+        this.activeResponseRequestId = null;
+      },
+      error: (err) => console.error("Error aborting transaction:", err)
+    });
+  }
+
   clearFields() {
     this.resetToInitialState();
     this.serviceRequestMessage = '';
-    this.deviceData.display = '';
-    this.deviceData.printer = '';
-    this.deviceData.cashierTerminal = '';
     this.lastShownDialogMessage = '';
     console.log("Clear button clicked, all fields cleared");
-
-    alert("Champs effacés avec succès !");
+    this.requestInfoService.resetTerminalSimulator().subscribe();
   }
 
   isBonusButtonEnabled(): boolean {
@@ -581,6 +625,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
   }
 
   private resetToInitialState() {
+    this.paidAmount = 0;
     this.requestData = {
       requestType: '',
       refNumber: '',
@@ -603,7 +648,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     this.basketData = {
       totalAmount: '',
       preAuthAmount: '',
-      currency: 'EUR',
+      currency: 'TND',
       saleItems: [],
       itemDetails: {
         productName: '',
@@ -639,11 +684,10 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
       bonusCard: false
     };
     this.deviceData = {
-      display: '',
+      display: 'Welcome to Cashier Simulator',
       printer: '',
       cashierTerminal: ''
     };
-    this.showFailureModal = false;
     this.activeResponseRequestId = null;
     this.responseRequestId = null;
     this.currentRequestId = '';
@@ -675,7 +719,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     return loyaltyDataRequiredTypes.includes(this.requestData.requestType);
   }
 
-  startPollingForResponse(requestId: string) {
+  startPollingForResponse(requestId: string, amountToSend?: string) {
     this.isLoading = true;
     this.activeResponseRequestId = requestId;
     this.responseRequestId = requestId;
@@ -701,6 +745,18 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
         this.pollingInterval = null;
       }
 
+      if (data && data.cardServiceResponse?.attributes?.overallResult === 'Success' && this.posData.split && amountToSend) {
+        this.paidAmount += parseFloat(amountToSend);
+        if (this.remainingBalance <= 0) {
+          setTimeout(() => {
+            alert('Split Payment Completed Fully! The consolidated receipt has been printed.');
+          }, 500);
+          this.posData.split = false;
+          this.paidAmount = 0;
+          this.requestInfoService.updateData({ posData: this.posData });
+        }
+      }
+
       // Fetch device messages one final time to ensure we catch any delayed Printer/Display messages
       // that arrived exactly as the transaction completed.
       setTimeout(() => {
@@ -718,11 +774,6 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
       
       this.cdr.detectChanges();
       console.log("Response fully received!");
-
-      const overallResult = data?.cardServiceResponse?.attributes?.overallResult;
-      if (overallResult === 'Failure') {
-        this.showFailureModal = true;
-      }
     };
 
     const pollForResponse = () => {
