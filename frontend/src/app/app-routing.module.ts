@@ -5,6 +5,7 @@ import { ResponseInfoComponent } from './response-info/response-info.component';
 import { PosDataComponent } from './pos-data/pos-data.component';
 import { BasketComponent } from './basket/basket.component';
 import { LoyaltyComponent } from './loyalty/loyalty.component';
+import { TransactionHistoryComponent } from './transaction-history/transaction-history.component';
 
 const routes: Routes = [
   { 
@@ -17,6 +18,7 @@ const routes: Routes = [
     ] 
   },
   { path: 'response-info', component: ResponseInfoComponent },
+  { path: 'history', component: TransactionHistoryComponent },
   { path: '', redirectTo: '/request-info', pathMatch: 'full' },
 ];
 

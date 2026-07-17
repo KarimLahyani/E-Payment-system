@@ -5,5 +5,7 @@ export interface ResponseInfo {
     overallResult: string;
     stan: string;
     requestId: string;
+    cardNumber?: string;
+    customerName?: string;
   }
   

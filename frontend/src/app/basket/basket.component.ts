@@ -158,22 +158,23 @@ export class BasketComponent implements OnInit, OnDestroy {
   refreshAfterResponse(requestId: string) {
     // The user requested that after a transaction, the basket should clear to 0 and all items should be deselected 
     // so the cashier is ready for the next customer.
-    console.log('Transaction finished for requestId:', requestId, '. Clearing basket for next customer.');
-    this.basketData.totalAmount = '0.00';
-    this.basketData.preAuthAmount = '0.00';
+    console.log('Transaction finished for requestId:', requestId, '. (Basket clearing is now disabled as requested).');
     
-    // Deselect all items
-    this.saleItemsList = this.saleItemsList.map(item => ({
-      ...item,
-      isSelected: false,
-      quantity: '',
-      itemAmount: ''
-    }));
-    
-    this.basketData.saleItems = [];
-    this.selectedSaleItem = null;
-    
-    this.updateDisplayedItems();
+    // this.basketData.totalAmount = '0.00';
+    // this.basketData.preAuthAmount = '0.00';
+    // 
+    // // Deselect all items
+    // this.saleItemsList = this.saleItemsList.map(item => ({
+    //   ...item,
+    //   isSelected: false,
+    //   quantity: '',
+    //   itemAmount: ''
+    // }));
+    // 
+    // this.basketData.saleItems = [];
+    // this.selectedSaleItem = null;
+    // 
+    // this.updateDisplayedItems();
     this.requestInfoService.updateData({ basketData: this.basketData });
     this.cdr.detectChanges();
   }

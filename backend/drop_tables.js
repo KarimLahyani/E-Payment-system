@@ -14,6 +14,7 @@ async function dropTables() {
       DROP TABLE IF EXISTS response_info CASCADE;
       DROP TABLE IF EXISTS request_info CASCADE;
       DROP TABLE IF EXISTS products CASCADE;
+      DROP TABLE IF EXISTS cards CASCADE;
     `);
     
     console.log("Successfully dropped all tables to apply new schema.");

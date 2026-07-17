@@ -108,6 +108,8 @@ CREATE TABLE IF NOT EXISTS response_info (
     terminal_id VARCHAR(255),
     terminal_batch VARCHAR(255),
     amount VARCHAR(255),
+    card_number VARCHAR(255),
+    customer_name VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -273,7 +273,6 @@ const setupRoutes = (app) => {
           posData.languageCode || null,
           posData.cardEntryMode || null,
           posData.shiftNumber || null,
-          posData.outdoorPosition || null,
           posData.clerkId || null,
           posData.posName || null,
           posData.split || false,
@@ -281,7 +280,7 @@ const setupRoutes = (app) => {
           requestId,
         ];
         await insertWithErrorHandling(
-          'INSERT INTO pos_data (pos_timestamp, language_code, card_entry_mode, shift_number, outdoor_position, clerk_id, pos_name, split, unattended, request_info_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+          'INSERT INTO pos_data (pos_timestamp, language_code, card_entry_mode, shift_number, clerk_id, pos_name, split, unattended, request_info_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
           posValues,
           'Pos data inserted successfully:'
         );
@@ -844,6 +843,140 @@ const setupRoutes = (app) => {
     });
   });
 
+  app.get('/api/history', async (req, res) => {
+    try {
+      let { page = 1, limit = 50, startDate, endDate, status } = req.query;
+      page = parseInt(page, 10) || 1;
+      
+      let conditions = [];
+      let params = [];
+      let paramCount = 1;
+
+      if (startDate) {
+        conditions.push(`req.request_timestamp >= $${paramCount++}`);
+        params.push(startDate);
+      }
+      if (endDate) {
+        conditions.push(`req.request_timestamp <= $${paramCount++}`);
+        params.push(endDate);
+      }
+      if (status) {
+        if (status === 'Pending') {
+          conditions.push(`res.overall_result IS NULL`);
+        } else if (status === 'Failed') {
+          conditions.push(`(res.overall_result = 'Failure' OR res.overall_result = 'Failed')`);
+        } else {
+          conditions.push(`res.overall_result = $${paramCount++}`);
+          params.push(status);
+        }
+      }
+
+      const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+
+      // Count query
+      const countQuery = `
+        SELECT COUNT(req.id)
+        FROM request_info req
+        LEFT JOIN response_info res ON res.id = req.id
+        ${whereClause}
+      `;
+      const countResult = await pool.query(countQuery, params);
+      const totalCount = parseInt(countResult.rows[0].count, 10);
+
+      // Data query
+      let limitClause = '';
+      if (limit !== 'all') {
+        const parsedLimit = parseInt(limit, 10) || 50;
+        const offset = (page - 1) * parsedLimit;
+        limitClause = `LIMIT $${paramCount++} OFFSET $${paramCount++}`;
+        params.push(parsedLimit, offset);
+      }
+
+      const query = `
+        SELECT 
+          req.id, 
+          req.request_type, 
+          COALESCE(res.stan, req.stan) AS stan, 
+          req.request_timestamp,
+          b.total_amount AS basket_total,
+          b.currency,
+          res.overall_result,
+          res.error_condition,
+          pos.split AS is_split,
+          res.card_number,
+          res.customer_name
+        FROM request_info req
+        LEFT JOIN basket_data b ON b.request_info_id = req.id
+        LEFT JOIN response_info res ON res.id = req.id
+        LEFT JOIN pos_data pos ON pos.request_info_id = req.id
+        ${whereClause}
+        ORDER BY req.request_timestamp DESC
+        ${limitClause}
+      `;
+      const result = await pool.query(query, params);
+      
+      res.status(200).json({
+        totalCount,
+        transactions: result.rows,
+        page,
+        limit
+      });
+    } catch (error) {
+      console.error('Error fetching history:', error);
+      res.status(500).json({ message: 'Error fetching history' });
+    }
+  });
+
+  app.get('/api/history/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      
+      const reqQuery = `SELECT * FROM request_info WHERE id = $1`;
+      const resQuery = `SELECT * FROM response_info WHERE id = $1`;
+      const posQuery = `SELECT * FROM pos_data WHERE request_info_id = $1`;
+      const basketQuery = `SELECT * FROM basket_data WHERE request_info_id = $1`;
+      const loyaltyQuery = `SELECT * FROM loyalty WHERE request_info_id = $1`;
+
+      const [reqResult, resResult, posResult, basketResult, loyaltyResult] = await Promise.all([
+        pool.query(reqQuery, [id]),
+        pool.query(resQuery, [id]),
+        pool.query(posQuery, [id]),
+        pool.query(basketQuery, [id]),
+        pool.query(loyaltyQuery, [id]),
+      ]);
+
+      if (reqResult.rows.length === 0) {
+        return res.status(404).json({ message: 'Transaction not found' });
+      }
+
+      let saleItems = [];
+      if (basketResult.rows.length > 0) {
+        const basketId = basketResult.rows[0].id;
+        const itemsQuery = `
+          SELECT si.*, p.name as product_name 
+          FROM sale_items si
+          LEFT JOIN products p ON si.product_code = p.product_code
+          WHERE si.basket_data_id = $1
+        `;
+        const itemsResult = await pool.query(itemsQuery, [basketId]);
+        saleItems = itemsResult.rows;
+      }
+
+      res.status(200).json({
+        request_info: reqResult.rows[0],
+        response_info: resResult.rows[0] || null,
+        pos_data: posResult.rows[0] || null,
+        basket_data: basketResult.rows[0] || null,
+        sale_items: saleItems,
+        loyalty: loyaltyResult.rows[0] || null,
+      });
+
+    } catch (error) {
+      console.error('Error fetching transaction details:', error);
+      res.status(500).json({ message: 'Error fetching transaction details' });
+    }
+  });
+
   // --- Cards Endpoints ---
   app.get('/api/cards', async (req, res) => {
     try {
@@ -910,8 +1043,18 @@ const setupRoutes = (app) => {
     }
   });
 
-  app.post('/api/terminal/abort', (req, res) => {
+  app.post('/api/terminal/abort', async (req, res) => {
     try {
+      const { requestId } = req.body || {};
+      if (requestId) {
+        const query = `
+          INSERT INTO response_info (id, overall_result, response_timestamp)
+          VALUES ($1, $2, $3)
+          ON CONFLICT (id) DO UPDATE SET overall_result = EXCLUDED.overall_result, response_timestamp = EXCLUDED.response_timestamp
+        `;
+        await pool.query(query, [requestId, 'Aborted', new Date().toISOString()]);
+      }
+
       const { getSocketIo } = require('./tcpHandler');
       const io = getSocketIo();
       if (io) {

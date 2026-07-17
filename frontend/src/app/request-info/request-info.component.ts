@@ -485,7 +485,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
   }
 
   abortTransaction() {
-    this.requestInfoService.abortTransaction().subscribe({
+    this.requestInfoService.abortTransaction(this.activeResponseRequestId || undefined).subscribe({
       next: () => {
         console.log("Transaction aborted successfully");
         if (this.pollingInterval) {
@@ -748,9 +748,6 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
       if (data && data.cardServiceResponse?.attributes?.overallResult === 'Success' && this.posData.split && amountToSend) {
         this.paidAmount += parseFloat(amountToSend);
         if (this.remainingBalance <= 0) {
-          setTimeout(() => {
-            alert('Split Payment Completed Fully! The consolidated receipt has been printed.');
-          }, 500);
           this.posData.split = false;
           this.paidAmount = 0;
           this.requestInfoService.updateData({ posData: this.posData });

@@ -557,14 +557,13 @@
   <Card>
     <PAN>${card.number.slice(0, 6)}******${card.number.slice(-4)}</PAN>
     <ExpiryDate>${card.expiry.replace('-', '')}</ExpiryDate>
+    <CustomerName>${card.name}</CustomerName>
   </Card>
 </CardServiceResponse>`;
 
-        socket.emit('terminal:response', finalResponseXml);
-
         let shouldPrintReceipt = true;
         
-        if (decision.approved && state.transaction.split) {
+        if (state.transaction.split) {
           if (!state.splitSession || state.splitSession.basketTotal !== state.transaction.basketTotal) {
             state.splitSession = {
               basketTotal: state.transaction.basketTotal,
@@ -574,22 +573,24 @@
           }
           
           const cardKey = `**** ${card.number.slice(-4)}`;
-          const existingPayment = state.splitSession.payments.find(p => p.cardNumber === cardKey);
-          if (existingPayment) {
-            existingPayment.amount += state.transaction.amount;
-          } else {
-            state.splitSession.payments.push({
-              cardName: card.name.toUpperCase(),
-              cardNumber: cardKey,
-              amount: state.transaction.amount
-            });
-          }
+          state.splitSession.payments.push({
+            cardName: card.name.toUpperCase(),
+            cardNumber: cardKey,
+            amount: state.transaction.amount,
+            approved: decision.approved,
+            authCode: decision.authCode || 'N/A',
+            reason: decision.reason
+          });
           
-          state.splitSession.paidAmount += state.transaction.amount;
+          if (decision.approved) {
+            state.splitSession.paidAmount += state.transaction.amount;
+          }
           
           if (state.splitSession.paidAmount < state.splitSession.basketTotal) {
             shouldPrintReceipt = false;
-            setScreen(["APPROVED", "WAITING FOR NEXT PAYMENT..."]);
+            setScreen([decision.approved ? "APPROVED" : "DECLINED", "WAITING FOR NEXT PAYMENT..."]);
+            state.terminalMode = "waitingForCard";
+            state.insertedCardId = null;
           } else {
             shouldPrintReceipt = true;
           }
@@ -604,11 +605,13 @@
           if (decision.approved && state.splitSession) {
             state.splitSession = null; // Clear session after final receipt
           }
+          
+          // Auto-reset back to initial state after 5 seconds ONLY if the transaction is fully complete
+          window.setTimeout(resetSimulator, 5000);
         }
+        
+        socket.emit('terminal:response', finalResponseXml);
         render();
-      
-      // Auto-reset back to initial state after 5 seconds
-      window.setTimeout(resetSimulator, 5000);
     }, 650);
   }
 
@@ -869,32 +872,19 @@ ${indent}</${name}>`;
       lines.push(lblTotal + " ".repeat(40 - lblTotal.length - amountStrFormatted.length) + amountStrFormatted);
       
       if (transaction.split && state.splitSession && state.splitSession.payments) {
-        lines.push("");
-        const lblPayments = isFr ? "PAIEMENTS:" : "PAYMENTS:";
-        lines.push(lblPayments);
-        
         state.splitSession.payments.forEach(payment => {
+          lines.push(divider);
           const pAmount = parseFloat(payment.amount).toFixed(2);
-          const pCard = `${payment.cardName} (${payment.cardNumber})`;
-          
-          let line = pCard;
-          if (line.length + pAmount.length >= 40) {
-             lines.push(line);
-             lines.push(" ".repeat(40 - pAmount.length) + pAmount);
-          } else {
-             lines.push(line + " ".repeat(40 - line.length - pAmount.length) + pAmount);
-          }
+          const lblAmount = isFr ? "MONTANT:" : "AMOUNT:";
+          lines.push(lblAmount + " ".repeat(40 - lblAmount.length - pAmount.length) + pAmount);
+          lines.push(lblCard + " ".repeat(40 - lblCard.length - payment.cardNumber.length) + payment.cardNumber);
+          lines.push(lblName + " ".repeat(40 - lblName.length - payment.cardName.length) + payment.cardName.toUpperCase());
+          const authCode = payment.authCode || 'N/A';
+          lines.push(lblAuth + " ".repeat(40 - lblAuth.length - authCode.length) + authCode);
+          lines.push(lblEntry + " ".repeat(40 - lblEntry.length - entryVal.length) + entryVal);
+          const reason = (payment.reason || '').toUpperCase();
+          lines.push(lblStatus + " ".repeat(40 - lblStatus.length - reason.length) + reason);
         });
-        
-        lines.push(divider);
-        // Do not print individual card auth details for consolidated receipt, or print just the last one
-        lines.push(lblCard + " ".repeat(40 - lblCard.length - 9) + `**** ${card.number.slice(-4)}`);
-        lines.push(lblName + " ".repeat(40 - lblName.length - card.name.length) + card.name.toUpperCase());
-        const authCode = decision.authCode || 'N/A';
-        lines.push(lblAuth + " ".repeat(40 - lblAuth.length - authCode.length) + authCode);
-        lines.push(lblEntry + " ".repeat(40 - lblEntry.length - entryVal.length) + entryVal);
-        const reason = decision.reason.toUpperCase();
-        lines.push(lblStatus + " ".repeat(40 - lblStatus.length - reason.length) + reason);
       } else {
         lines.push(divider);
         lines.push(lblCard + " ".repeat(40 - lblCard.length - 9) + `**** ${card.number.slice(-4)}`);

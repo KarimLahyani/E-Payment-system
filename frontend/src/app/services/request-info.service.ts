@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable, BehaviorSubject, of } from 'rxjs';
 import { tap, catchError, finalize } from 'rxjs/operators';
 import { throwError } from 'rxjs';
@@ -126,8 +126,8 @@ export class RequestInfoService {
     );
   }
 
-  abortTransaction(): Observable<any> {
-    return this.http.post(`${this.apiUrl}/api/terminal/abort`, {});
+  abortTransaction(requestId?: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/api/terminal/abort`, { requestId });
   }
 
   getLastPosData(): Observable<PosData> {
@@ -409,6 +409,22 @@ export class RequestInfoService {
         return of(null);
       })
     );
+  }
+
+  getHistory(page: number = 1, limit: string | number = 50, filters: any = {}): Observable<any> {
+    let params = new HttpParams()
+      .set('page', page.toString())
+      .set('limit', limit.toString());
+      
+    if (filters.startDate) params = params.set('startDate', filters.startDate);
+    if (filters.endDate) params = params.set('endDate', filters.endDate);
+    if (filters.status) params = params.set('status', filters.status);
+
+    return this.http.get<any>(`${this.apiUrl}/api/history`, { params });
+  }
+
+  getTransactionDetails(id: number): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/api/history/${id}`);
   }
 
   updateLocalDeviceDisplay(message: string) {

@@ -15,6 +15,7 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { MatDialogModule } from '@angular/material/dialog'; // Ajout pour la popup
 import { MatButtonModule } from '@angular/material/button';
 import { CashierTerminalDialogComponent } from './cashier-terminal-dialog/cashier-terminal-dialog.component';
+import { TransactionHistoryComponent } from './transaction-history/transaction-history.component';
 
 @NgModule({
   declarations: [
@@ -26,7 +27,8 @@ import { CashierTerminalDialogComponent } from './cashier-terminal-dialog/cashie
     LoyaltyComponent,
     SaleItemComponent,
     ConfigurationModalComponent,
-    CashierTerminalDialogComponent
+    CashierTerminalDialogComponent,
+    TransactionHistoryComponent
   ],
   imports: [
     BrowserModule,

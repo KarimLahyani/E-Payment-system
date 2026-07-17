@@ -31,13 +31,21 @@ export class SaleItemComponent {
     let validatedValue = value !== null && value !== undefined ? value.toString() : '';
 
     // Valider que quantity et unitPrice ne contiennent que des valeurs numériques (positives ou décimales)
-    if (field === 'quantity' || field === 'unitPrice') {
+    if (field === 'quantity' || field === 'unitPrice' || field === 'itemAmount') {
       const numericValue = validatedValue.trim();
       if (numericValue === '') {
         validatedValue = '';
       } else if (!/^\d*\.?\d+$/.test(numericValue)) {
         console.warn(`Valeur invalide pour ${field}: "${value}". Seuls les nombres positifs ou décimaux sont autorisés.`);
         return;
+      }
+      
+      // Enforce integers for quantity if the item is sold by Unit
+      if (field === 'quantity' && this.saleItem.unitMeasure === 'Unit') {
+        if (numericValue !== '' && !/^\d+$/.test(numericValue)) {
+          console.warn(`Quantité invalide: "${value}". Les articles par 'Unit' doivent être des entiers.`);
+          return;
+        }
       }
     }
 
@@ -65,6 +73,10 @@ export class SaleItemComponent {
       case 'unitPrice':
         this.saleItem.unitPrice = validatedValue;
         this.calculateAmount(); // Recalculer itemAmount
+        break;
+      case 'itemAmount':
+        this.saleItem.itemAmount = validatedValue;
+        this.calculateQuantity(); // Recalculer quantity
         break;
       case 'unitMeasure':
         this.saleItem.unitMeasure = validatedValue;
@@ -113,5 +125,15 @@ export class SaleItemComponent {
     const amount = quantity * unitPrice;
     this.saleItem.itemAmount = amount.toFixed(2); // Arrondir à 2 décimales
     console.log(`Calculated amount for ${this.saleItem.productName}: quantity=${quantity}, unitPrice=${unitPrice}, itemAmount=${this.saleItem.itemAmount}`);
+  }
+
+  private calculateQuantity() {
+    const amount = parseFloat(this.saleItem.itemAmount) || 0;
+    const unitPrice = parseFloat(this.saleItem.unitPrice) || 0;
+    if (unitPrice > 0) {
+      const quantity = amount / unitPrice;
+      this.saleItem.quantity = quantity.toFixed(2);
+      console.log(`Calculated quantity for ${this.saleItem.productName}: amount=${amount}, unitPrice=${unitPrice}, quantity=${this.saleItem.quantity}`);
+    }
   }
 }
