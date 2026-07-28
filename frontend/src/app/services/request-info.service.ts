@@ -240,7 +240,7 @@ export class RequestInfoService {
           ...item,
           productName: item.productName || '',
           productCode: item.productCode || '',
-          itemAmount: item.itemAmount || '',
+          amount: item.amount || '',
           quantity: item.quantity || '',
           taxCode: item.taxCode || '',
           addProdCode: item.addProdCode || '',
@@ -256,7 +256,7 @@ export class RequestInfoService {
         itemDetails: {
           productName: '',
           productCode: '',
-          itemAmount: '',
+          amount: '',
           quantity: '',
           taxCode: '',
           addProdCode: '',

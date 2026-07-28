@@ -171,7 +171,7 @@
                          }
                          return {
                            productName: i.product_name || i.product_code,
-                           itemAmount: parseFloat(i.amount),
+                           amount: parseFloat(i.amount),
                            quantity: parseFloat(i.quantity),
                            unitPrice: info.unitPrice,
                            unitMeasure: info.unitMeasure,
@@ -238,7 +238,7 @@
                          }
                          return {
                            productName: i.product_name || i.product_code,
-                           itemAmount: parseFloat(i.amount),
+                           amount: parseFloat(i.amount),
                            quantity: parseFloat(i.quantity),
                            unitPrice: info.unitPrice,
                            unitMeasure: info.unitMeasure,
@@ -323,13 +323,13 @@
         const quantity = parseFloat((itemXml.match(/<Quantity[^>]*>([\d\.]+)<\/Quantity>/) || [])[1] || 1);
         const unitPrice = parseFloat((itemXml.match(/<UnitPrice[^>]*>([\d\.]+)<\/UnitPrice>/) || [])[1] || 0);
         const unitMeasure = (itemXml.match(/<UnitMeasure[^>]*>([^<]+)<\/UnitMeasure>/) || [])[1] || 'L';
-        const itemAmountMatch = itemXml.match(/<(?:Item)?Amount[^>]*>([\d\.]+)<\/(?:Item)?Amount>/);
-        const itemAmount = parseFloat(itemAmountMatch ? itemAmountMatch[1] : (quantity * unitPrice));
+        const amountMatch = itemXml.match(/<(?:Item)?Amount[^>]*>([\d\.]+)<\/(?:Item)?Amount>/);
+        const amount = parseFloat(amountMatch ? amountMatch[1] : (quantity * unitPrice));
         const pumpId = (itemXml.match(/<OutdoorPosition[^>]*>([^<]+)<\/OutdoorPosition>/) || [])[1] || null;
         const taxCode = (itemXml.match(/<TaxCode[^>]*>([^<]+)<\/TaxCode>/) || [])[1] || 'A';
         const itemId = (itemXml.match(/ItemID="([^"]+)"/) || [])[1] || `i${items.length + 1}`;
         
-        items.push({ itemId, productName, productCode, quantity, unitPrice, unitMeasure, itemAmount, pumpId, taxCode });
+        items.push({ itemId, productName, productCode, quantity, unitPrice, unitMeasure, amount, pumpId, taxCode });
       }
 
       state.transaction = {
@@ -346,7 +346,7 @@
           unitPrice: 1.85,
           unitMeasure: 'L',
           quantity: calculateQuantity(amount, 1.85),
-          itemAmount: amount
+          amount: amount
         }],
         siteId: "SITE-0142",
         driverId: "DRV-1008",
@@ -754,7 +754,7 @@
           
           if (state.transaction.items && state.transaction.items.length > 0) {
             saleItemsXml = state.transaction.items.map(item => {
-              let originalItemAmount = (item.quantity && item.unitPrice) ? (item.quantity * item.unitPrice) : item.itemAmount;
+              let originalItemAmount = (item.quantity && item.unitPrice) ? (item.quantity * item.unitPrice) : item.amount;
               let isApplicable = applicableProducts.length === 0 || applicableProducts.includes(item.productCode);
               
               let itemDiscount = isApplicable ? originalItemAmount * (discountPercentage / 100) : 0;
@@ -765,7 +765,7 @@
               
               let rebateLabelXml = isApplicable ? `\n    <RebateLabel>${discountInfo.rebateLabel}</RebateLabel>` : '';
               
-              item.itemAmount = newItemAmount;
+              item.amount = newItemAmount;
               
               return `
   <SaleItem ItemID="${item.itemId}">
@@ -774,7 +774,7 @@
   </SaleItem>`;
             }).join('');
             
-            let newTotalAmount = state.transaction.items.reduce((sum, item) => sum + item.itemAmount, 0);
+            let newTotalAmount = state.transaction.items.reduce((sum, item) => sum + item.amount, 0);
             state.transaction.amount = newTotalAmount.toFixed(2);
             totalAmount = state.transaction.amount;
           }
@@ -1082,7 +1082,7 @@ ${indent}</${name}>`;
       transaction.items.forEach(item => {
         const qtyStr = parseFloat(item.quantity || 1).toFixed(2);
         const unitPriceStr = parseFloat(item.unitPrice || 0).toFixed(3);
-        const itemAmt = parseFloat(item.itemAmount || (item.quantity * item.unitPrice));
+        const itemAmt = parseFloat(item.amount || (item.quantity * item.unitPrice));
         
         const taxCode = item.taxCode || 'A';
         const taxRate = taxMultipliers[taxCode] || 0;

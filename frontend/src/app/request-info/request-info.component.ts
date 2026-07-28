@@ -59,7 +59,7 @@ const DEFAULT_BASKET_DATA: BasketData = {
   itemDetails: {
     productName: '',
     productCode: '',
-    itemAmount: '',
+    amount: '',
     quantity: '',
     taxCode: '',
     addProdCode: '',
@@ -227,7 +227,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
           return {
             productName: product.productName,
             productCode: product.productCode,
-            itemAmount: existing?.itemAmount || '',
+            amount: existing?.amount || '',
             quantity: existing?.quantity || '',
             taxCode: product.taxCode,
             addProdCode: existing?.addProdCode || '',
@@ -658,7 +658,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
       itemDetails: {
         productName: '',
         productCode: '',
-        itemAmount: '',
+        amount: '',
         quantity: '',
         taxCode: '',
         addProdCode: '',
@@ -765,7 +765,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
             saleItems.forEach((incomingItem: any) => {
               const matchedItem = this.basketData.saleItems.find(bItem => bItem.productCode === incomingItem.productCode);
               if (matchedItem) {
-                matchedItem.itemAmount = incomingItem.amount || matchedItem.itemAmount;
+                matchedItem.amount = incomingItem.amount || matchedItem.amount;
                 matchedItem.rebateLabel = incomingItem.rebateLabel || matchedItem.rebateLabel;
               }
             });

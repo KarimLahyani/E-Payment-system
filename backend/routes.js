@@ -360,17 +360,7 @@ const setupRoutes = (app) => {
   });
 
   // Endpoint to process the CardServiceResponse
-  app.post('/process-response/:requestId', async (req, res) => {
-    const responseXML = getLastResponseXML();
-    if (!responseXML) {
-      return res.status(404).json({ message: 'No response XML available' });
-    }
-    console.log(`Processing response for RequestID in /process-response endpoint`);
-    await processCardServiceResponse(responseXML);
-    res.status(200).json({ message: 'Response processed successfully' });
-  });
 
-  // Endpoint pour récupérer la dernière ligne de loyalty
   app.get('/last-loyalty-data', async (req, res) => {
     try {
       const result = await pool.query('SELECT * FROM loyalty WHERE loyalty_timestamp IS NOT NULL ORDER BY loyalty_timestamp DESC LIMIT 1');
@@ -403,16 +393,7 @@ const setupRoutes = (app) => {
     }
   });
 
-  // Endpoint pour récupérer la dernière réponse XML
-  app.get('/last-response-xml', (req, res) => {
-    const responseXML = getLastResponseXML();
-    if (!responseXML) {
-      return res.status(404).json({ message: 'No response XML available' });
-    }
-    res.status(200).json({ responseXML });
-  });
 
-  // Endpoint pour récupérer la dernière réponse info
   app.get('/last-response-info', async (req, res) => {
     try {
       const result = await pool.query(
@@ -519,15 +500,6 @@ const setupRoutes = (app) => {
       }
     });
 
-  app.get('/last-service-request', (req, res) => {
-    if (!lastServiceRequest) {
-      return res.status(404).json({ message: 'No Service Request available' });
-    }
-    const xmlString = Buffer.isBuffer(lastServiceRequest) ? lastServiceRequest.toString('latin1') : lastServiceRequest;
-    console.log('Returning last service request:', xmlString);
-    res.status(200).json({ serviceRequest: xmlString });
-  });
-
   app.get('/last-pos-data', async (req, res) => {
     try {
       const result = await pool.query('SELECT * FROM pos_data ORDER BY id DESC LIMIT 1');
@@ -623,7 +595,7 @@ const setupRoutes = (app) => {
             itemId: item.item_id || '',
             buttonLabel: item.button_label || '',
             productCode: item.product_code || '',
-            itemAmount: item.amount || '',
+            amount: item.amount || '',
             quantity: item.quantity || '',
             taxCode: item.tax_code || '',
             addProdCode: item.add_prod_code || '',
@@ -813,36 +785,6 @@ const setupRoutes = (app) => {
     }
   });
 
-  app.get('/amount-data/:id/sale-items', async (req, res) => {
-    try {
-      const result = await pool.query(
-        `SELECT si.*, p.name as button_label, p.unit_price, p.unit_measure, p.tax_code 
-         FROM sale_items si 
-         LEFT JOIN products p ON si.product_code = p.product_code 
-         WHERE si.basket_data_id = $1 ORDER BY si.id`, 
-        [req.params.id]
-      );
-      res.json(result.rows.map(transformSaleItem));
-    } catch (error) {
-      console.error('Error fetching saleItems:', error);
-      res.status(500).json({ message: 'Internal server error', error: error.message });
-    }
-  });
-
-  app.post('/amount-data/:id/sale-items', async (req, res) => {
-    const item = req.body;
-    try {
-      const result = await insertWithErrorHandling(
-        'INSERT INTO sale_items (basket_data_id, product_code, amount, quantity, add_prod_code, reverse_sale, sale_channel, rebate_label, add_prod_info, pump_id, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP) ON CONFLICT (basket_data_id, product_code) DO UPDATE SET amount = $3, quantity = $4, add_prod_code = $5, reverse_sale = $6, sale_channel = $7, rebate_label = $8, add_prod_info = $9, pump_id = $10, created_at = CURRENT_TIMESTAMP RETURNING *',
-        prepareSaleItemValues(item, req.params.id),
-        'Sale item updated successfully:'
-      );
-      res.json(result ? transformSaleItem(result.rows[0]) : { message: 'Failed to update sale item' });
-    } catch (error) {
-      console.error('Error updating sale item:', error);
-      res.status(500).json({ message: 'Internal server error', error: error.message });
-    }
-  });
 
   app.post('/configuration', (req, res) => {
     const { clientIp, serverIp, epsPort, posProxyPort, opiMode } = req.body;
@@ -949,7 +891,19 @@ const setupRoutes = (app) => {
       
       res.status(200).json({
         totalCount,
-        transactions: result.rows,
+        transactions: result.rows.map(tx => ({
+          id: tx.id,
+          requestType: tx.request_type,
+          stan: tx.stan,
+          requestTimestamp: tx.request_timestamp,
+          basketTotal: tx.basket_total,
+          currency: tx.currency,
+          overallResult: tx.overall_result,
+          errorCondition: tx.error_condition,
+          isSplit: tx.is_split,
+          cardNumber: tx.card_number,
+          customerName: tx.customer_name
+        })),
         page,
         limit
       });
@@ -1015,14 +969,24 @@ const setupRoutes = (app) => {
         }
       }
 
+      const mapObj = (obj) => {
+        if (!obj) return null;
+        const newObj = {};
+        for (const key in obj) {
+          const camelKey = key.replace(/_([a-z])/g, g => g[1].toUpperCase());
+          newObj[camelKey] = obj[key];
+        }
+        return newObj;
+      };
+
       res.status(200).json({
-        request_info: reqResult.rows[0],
-        original_transaction_info: originalTransactionInfo,
-        response_info: resResult.rows[0] || null,
-        pos_data: posResult.rows[0] || null,
-        basket_data: basketResult.rows[0] || null,
-        sale_items: saleItems,
-        loyalty: loyaltyResult.rows[0] || null,
+        requestInfo: mapObj(reqResult.rows[0]),
+        originalTransactionInfo: mapObj(originalTransactionInfo),
+        responseInfo: mapObj(resResult.rows[0]),
+        posData: mapObj(posResult.rows[0]),
+        basketData: mapObj(basketResult.rows[0]),
+        saleItems: saleItems.map(mapObj),
+        loyalty: mapObj(loyaltyResult.rows[0])
       });
 
     } catch (error) {

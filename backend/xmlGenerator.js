@@ -253,7 +253,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
       saleItemsSection = selectedItems.map((item, index) => {
         const itemId = String(index + 1); // IFSF requires a 1-based sequential ItemID
         const productCode = String(item.productCode || '').trim();
-        const itemAmount = formatNumberWithLeadingZeros(item.itemAmount || '0.00', 7, 2);
+        const amount = formatNumberWithLeadingZeros(item.amount || '0.00', 7, 2);
         const unitMeasure = String(item.unitMeasure || '').trim();
         const unitPrice = formatNumberWithLeadingZeros(item.unitPrice || '0.00', 4, 3);
         const quantity = formatNumberWithLeadingZeros(item.quantity || '0.00', 5, 2);
@@ -268,7 +268,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
         
         const saleItemLine1 = `    <SaleItem ItemID="${itemId}"${reverseSale === 'true' ? ` ReverseSale="${reverseSale}"` : ''}>`;
         const saleItemLine2 = `        <ProductCode>${productCode}</ProductCode>`;
-        const saleItemLine3 = `        <ItemAmount>${itemAmount}</ItemAmount>`;
+        const saleItemLine3 = `        <ItemAmount>${amount}</ItemAmount>`;
         const saleItemLine4 = unitMeasure ? `        <UnitMeasure>${unitMeasure}</UnitMeasure>` : '';
         const saleItemLine5 = unitPrice ? `        <UnitPrice>${unitPrice}</UnitPrice>` : '';
         const saleItemLine6 = quantity ? `        <Quantity>${quantity}</Quantity>` : '';

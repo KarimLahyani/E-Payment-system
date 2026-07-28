@@ -6,7 +6,7 @@ const normalizeProductName = (label) => label.charAt(0).toUpperCase() + label.sl
 const prepareSaleItemValues = (item, basketDataId) => [
   basketDataId,
   item.productCode || '',
-  item.itemAmount || item.amount || '',
+  item.amount || '',
   item.quantity || '',
   item.addProdCode || '',
   item.reverseSale || '',
@@ -18,21 +18,21 @@ const prepareSaleItemValues = (item, basketDataId) => [
 
 // Transformer un SaleItem pour la réponse API
 const transformSaleItem = (item) => ({
-  itemId: item.item_id || '',
-  productName: normalizeProductName(item.product_name),
-  productCode: item.product_code || '',
-  itemAmount: item.amount || '',
+  itemId: item.item_id || item.itemId || '',
+  productName: normalizeProductName(item.product_name || item.productName || ''),
+  productCode: item.product_code || item.productCode || '',
+  amount: item.amount || '',
   quantity: item.quantity || '',
-  taxCode: item.tax_code || '',
-  addProdCode: item.add_prod_code || '',
-  reverseSale: item.reverse_sale || '',
-  unitPrice: item.unit_price || '',
-  unitMeasure: item.unit_measure || '',
-  saleChannel: item.sale_channel || '',
-  rebateLabel: item.rebate_label || '',
-  addProdInfo: item.add_prod_info || '',
-  isSelected: item.is_selected || false,
-  createdAt: item.created_at || ''
+  taxCode: item.tax_code || item.taxCode || '',
+  addProdCode: item.add_prod_code || item.addProdCode || '',
+  reverseSale: item.reverse_sale || item.reverseSale || '',
+  unitPrice: item.unit_price || item.unitPrice || '',
+  unitMeasure: item.unit_measure || item.unitMeasure || '',
+  saleChannel: item.sale_channel || item.saleChannel || '',
+  rebateLabel: item.rebate_label || item.rebateLabel || '',
+  addProdInfo: item.add_prod_info || item.addProdInfo || '',
+  isSelected: item.is_selected || item.isSelected || false,
+  createdAt: item.created_at || item.createdAt || ''
 });
 
 // Générer des SaleItem par défaut
@@ -40,7 +40,7 @@ const generateDefaultSaleItems = (count = 35) => Array.from({ length: count }, (
   itemId: '',
   productName: `Item${i + 1}`,
   productCode: '',
-  itemAmount: '',
+  amount: '',
   quantity: '',
   taxCode: '',
   addProdCode: '',

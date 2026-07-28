@@ -46,21 +46,21 @@ export class TransactionHistoryComponent implements OnInit {
         for (let i = 0; i < rawTransactions.length; i++) {
           const tx = rawTransactions[i];
           // Fix old DB entries that have " TND" appended to the amount string
-          if (tx.basket_total && typeof tx.basket_total === 'string') {
-            tx.basket_total = tx.basket_total.replace(/ (TND|EUR|USD|GBP|€|\$|£)/g, '').trim();
+          if (tx.basketTotal && typeof tx.basketTotal === 'string') {
+            tx.basketTotal = tx.basketTotal.replace(/ (TND|EUR|USD|GBP|'|\$|)/g, '').trim();
           }
-          if (tx.original_basket_total && typeof tx.original_basket_total === 'string') {
-            tx.original_basket_total = tx.original_basket_total.replace(/ (TND|EUR|USD|GBP|€|\$|£)/g, '').trim();
+          if (tx.originalBasketTotal && typeof tx.originalBasketTotal === 'string') {
+            tx.originalBasketTotal = tx.originalBasketTotal.replace(/ (TND|EUR|USD|GBP|'|\$|)/g, '').trim();
           }
         }
 
         for (let i = 0; i < rawTransactions.length - 1; i++) {
           const current = rawTransactions[i];
           const previous = rawTransactions[i + 1]; // Previous in time (since order is DESC)
-          if (current.request_type === 'CardPayment' && (previous.request_type === 'LoyaltyAward' || previous.request_type === 'LoyaltyAwardRefund')) {
-            const currentAmount = parseFloat(current.basket_total) || 0;
-            const previousAmount = parseFloat(previous.basket_total) || 0;
-            if (currentAmount === previousAmount && current.overall_result === 'Success' && previous.overall_result === 'Success') {
+          if (current.requestType === 'CardPayment' && (previous.requestType === 'LoyaltyAward' || previous.requestType === 'LoyaltyAwardRefund')) {
+            const currentAmount = parseFloat(current.basketTotal) || 0;
+            const previousAmount = parseFloat(previous.basketTotal) || 0;
+            if (currentAmount === previousAmount && current.overallResult === 'Success' && previous.overallResult === 'Success') {
               current.linkedToId = previous.id;
             }
           }
@@ -70,43 +70,43 @@ export class TransactionHistoryComponent implements OnInit {
         let currentGroup: any = null;
 
         for (const tx of rawTransactions) {
-          if (tx.is_split) {
+          if (tx.isSplit) {
             if (!currentGroup) {
               currentGroup = {
                 isGroup: true,
                 id: tx.id.toString(),
-                request_timestamp: tx.request_timestamp,
-                request_type: tx.request_type,
-                basket_total: tx.overall_result === 'Success' ? parseFloat(tx.basket_total || '0') : 0,
+                requestTimestamp: tx.requestTimestamp,
+                requestType: tx.requestType,
+                basketTotal: tx.overallResult === 'Success' ? parseFloat(tx.basketTotal || '0') : 0,
                 currency: tx.currency,
                 stan: tx.stan ? tx.stan.toString() : '',
-                overall_result: tx.overall_result,
-                customer_name: tx.customer_name,
-                card_number: tx.card_number,
+                overallResult: tx.overallResult,
+                customerName: tx.customerName,
+                cardNumber: tx.cardNumber,
                 transactions: [tx]
               };
             } else {
               currentGroup.id = currentGroup.id + ', ' + tx.id;
-              if (tx.card_number && currentGroup.card_number !== tx.card_number && !currentGroup.card_number.includes('Multiple')) {
-                currentGroup.card_number = 'Multiple Cards';
-                currentGroup.customer_name = 'Multiple Customers';
+              if (tx.cardNumber && currentGroup.cardNumber !== tx.cardNumber && !currentGroup.cardNumber.includes('Multiple')) {
+                currentGroup.cardNumber = 'Multiple Cards';
+                currentGroup.customerName = 'Multiple Customers';
               }
-              if (tx.overall_result === 'Success') {
-                currentGroup.basket_total += parseFloat(tx.basket_total || '0');
+              if (tx.overallResult === 'Success') {
+                currentGroup.basketTotal += parseFloat(tx.basketTotal || '0');
               }
               currentGroup.stan += tx.stan ? (', ' + tx.stan) : '';
               currentGroup.transactions.push(tx);
 
               // Determine overall result logic for groups (e.g. if any failed, mark partial or failed)
-              if (tx.overall_result === 'Failed' && currentGroup.overall_result === 'Success') {
-                currentGroup.overall_result = 'Partial';
-              } else if (tx.overall_result === 'Success' && currentGroup.overall_result === 'Failed') {
-                currentGroup.overall_result = 'Partial';
+              if (tx.overallResult === 'Failed' && currentGroup.overallResult === 'Success') {
+                currentGroup.overallResult = 'Partial';
+              } else if (tx.overallResult === 'Success' && currentGroup.overallResult === 'Failed') {
+                currentGroup.overallResult = 'Partial';
               }
             }
           } else {
             if (currentGroup) {
-              currentGroup.basket_total = currentGroup.basket_total.toFixed(2);
+              currentGroup.basketTotal = currentGroup.basketTotal.toFixed(2);
               grouped.push(currentGroup);
               currentGroup = null;
             }
@@ -114,7 +114,7 @@ export class TransactionHistoryComponent implements OnInit {
           }
         }
         if (currentGroup) {
-          currentGroup.basket_total = currentGroup.basket_total.toFixed(2);
+          currentGroup.basketTotal = currentGroup.basketTotal.toFixed(2);
           grouped.push(currentGroup);
         }
 
@@ -179,13 +179,13 @@ export class TransactionHistoryComponent implements OnInit {
 
           // Override the total paid to reflect the sum of all splits in the group
           const groupTotal = tx.transactions.reduce((sum: number, splitTx: any) => {
-            if (splitTx.overall_result === 'Success') {
-              return sum + parseFloat(splitTx.basket_total || '0');
+            if (splitTx.overallResult === 'Success') {
+              return sum + parseFloat(splitTx.basketTotal || '0');
             }
             return sum;
           }, 0);
-          if (this.selectedTransaction.basket_data) {
-            this.selectedTransaction.basket_data.total_amount = groupTotal.toFixed(2);
+          if (this.selectedTransaction.basketData) {
+            this.selectedTransaction.basketData.totalAmount = groupTotal.toFixed(2);
           }
         }
         this.isLoadingDetails = false;
@@ -206,7 +206,7 @@ export class TransactionHistoryComponent implements OnInit {
   hasDiscount(items: any[]): boolean {
     if (!items || !Array.isArray(items) || items.length === 0) return false;
     return items.some(item => {
-      const label = item.rebate_label || item.rebateLabel;
+      const label = item.rebateLabel;
       return label && typeof label === 'string' && label.trim().length > 0 && label !== 'null' && label !== 'undefined';
     });
   }
@@ -214,15 +214,15 @@ export class TransactionHistoryComponent implements OnInit {
   getOriginalTotal(items: any[]): number {
     if (!items || items.length === 0) return 0;
     return items.reduce((sum, item) => {
-      if (item.rebate_label && item.base_unit_price) {
-        return sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.base_unit_price) || 0));
+      if (item.rebateLabel && item.baseUnitPrice) {
+        return sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.baseUnitPrice) || 0));
       }
       return sum + (parseFloat(item.amount) || 0);
     }, 0);
   }
 
   getOriginalItemAmount(item: any): number {
-    return (parseFloat(item.quantity) || 0) * (parseFloat(item.base_unit_price) || 0);
+    return (parseFloat(item.quantity) || 0) * (parseFloat(item.baseUnitPrice) || 0);
   }
 
   closeDetails(): void {

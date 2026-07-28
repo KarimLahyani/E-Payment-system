@@ -42,8 +42,6 @@ const io = new Server(httpServer, {
 // Provide io to tcpHandler
 setSocketIo(io);
 
-// Variable globale pour stocker la dernière réponse XML
-let lastResponseXML = '';
 
 // Middleware Express
 app.use(cors({
@@ -66,13 +64,7 @@ async function startServer() {
     // Configuration des routes
     setupRoutes(app);
 
-    // Endpoint pour récupérer la dernière réponse XML
-    app.get('/last-response-xml', (req, res) => {
-      if (!lastResponseXML) {
-        return res.status(404).json({ message: 'No response XML available' });
-      }
-      res.status(200).json({ responseXML: lastResponseXML });
-    });
+
 
     httpServer.listen(port, () => {
       console.log(`Server running on http://localhost:${port}`);

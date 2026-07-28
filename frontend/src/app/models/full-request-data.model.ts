@@ -30,7 +30,7 @@ export interface PosData {
 export interface SaleItem {
   productName: string;
   productCode: string;
-  itemAmount: string;
+  amount: string;
   quantity: string;
   taxCode: string;
   addProdCode: string;

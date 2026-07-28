@@ -23,7 +23,7 @@ export class BasketComponent implements OnInit, OnDestroy {
     itemDetails: {
       productName: '',
       productCode: '',
-      itemAmount: '',
+      amount: '',
       quantity: '',
       taxCode: '',
       addProdCode: '',
@@ -72,7 +72,7 @@ export class BasketComponent implements OnInit, OnDestroy {
               return {
                 productName: product.productName,
                 productCode: product.productCode,
-                itemAmount: existing?.itemAmount || '',
+                amount: existing?.amount || '',
                 quantity: existing?.quantity || '',
                 taxCode: product.taxCode,
                 addProdCode: existing?.addProdCode || '',
@@ -118,7 +118,7 @@ export class BasketComponent implements OnInit, OnDestroy {
                 ...matchingItem,
                 productName: defaultItem.productName || matchingItem.productName,
                 productCode: defaultItem.productCode || matchingItem.productCode,
-                itemAmount: matchingItem.itemAmount || defaultItem.itemAmount,
+                amount: matchingItem.amount || defaultItem.amount,
                 quantity: defaultItem.quantity || matchingItem.quantity,
                 taxCode: defaultItem.taxCode || matchingItem.taxCode,
                 addProdCode: defaultItem.addProdCode || matchingItem.addProdCode,
@@ -165,7 +165,7 @@ export class BasketComponent implements OnInit, OnDestroy {
     //   ...item,
     //   isSelected: false,
     //   quantity: '',
-    //   itemAmount: ''
+    //   amount: ''
     // }));
     // 
     // this.basketData.saleItems = [];
@@ -220,7 +220,7 @@ export class BasketComponent implements OnInit, OnDestroy {
         if (qty === 0) {
           updatedItem.quantity = '1';
           const unitPrice = parseFloat(updatedItem.unitPrice) || 0;
-          updatedItem.itemAmount = (1 * unitPrice).toFixed(2);
+          updatedItem.amount = (1 * unitPrice).toFixed(2);
         }
       }
       
@@ -263,7 +263,7 @@ export class BasketComponent implements OnInit, OnDestroy {
     if (recalculateTotal) {
       const total = this.saleItemsList
         .filter(item => item.isSelected)
-        .reduce((sum, item) => sum + (parseFloat(item.itemAmount) || 0), 0);
+        .reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
       this.basketData.totalAmount = total.toFixed(2);
     }
     console.log('Updated totalAmount (updateBasketData):', this.basketData.totalAmount);
@@ -307,7 +307,7 @@ export class BasketComponent implements OnInit, OnDestroy {
                 ...item,
                 productName: item.productName || existingItem?.productName || '',
                 productCode: item.productCode || existingItem?.productCode,
-                itemAmount: item.itemAmount || existingItem?.itemAmount,
+                amount: item.amount || existingItem?.amount,
                 quantity: existingItem?.quantity || item.quantity,
                 taxCode: existingItem?.taxCode || item.taxCode,
                 addProdCode: existingItem?.addProdCode || item.addProdCode,
@@ -333,7 +333,7 @@ export class BasketComponent implements OnInit, OnDestroy {
               ...item,
               isSelected: false,
               quantity: '',
-              itemAmount: ''
+              amount: ''
             }));
             this.basketData.saleItems = [];
             this.selectedSaleItem = null;

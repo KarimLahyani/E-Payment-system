@@ -98,52 +98,52 @@
               <span *ngIf="tx.isGroup">#{{ tx.id }}</span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              {{ tx.request_timestamp | date:'MMM d, y, h:mm:ss a' }}
+              {{ tx.requestTimestamp | date:'MMM d, y, h:mm:ss a' }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium flex flex-col items-start gap-1">
-              {{ tx.request_type || 'Unknown' }}
+              {{ tx.requestType || 'Unknown' }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">
-              <div *ngIf="tx.original_basket_total && tx.original_basket_total !== tx.basket_total"
+              <div *ngIf="tx.originalBasketTotal && tx.originalBasketTotal !== tx.basketTotal"
                 class="flex flex-col">
-                <span class="text-xs line-through text-gray-400">{{ tx.original_basket_total }} {{ tx.currency || 'TND'
+                <span class="text-xs line-through text-gray-400">{{ tx.originalBasketTotal }} {{ tx.currency || 'TND'
                   }}</span>
-                <span class="text-green-600 font-bold">{{ tx.basket_total }} {{ tx.currency || 'TND' }}</span>
+                <span class="text-green-600 font-bold">{{ tx.basketTotal }} {{ tx.currency || 'TND' }}</span>
               </div>
-              <span *ngIf="!tx.original_basket_total || tx.original_basket_total === tx.basket_total">
-                {{ tx.basket_total ? (tx.basket_total + ' ' + (tx.currency || 'TND')) : '-' }}
+              <span *ngIf="!tx.originalBasketTotal || tx.originalBasketTotal === tx.basketTotal">
+                {{ tx.basketTotal ? (tx.basketTotal + ' ' + (tx.currency || 'TND')) : '-' }}
               </span>
-              <span *ngIf="tx.is_split"
+              <span *ngIf="tx.isSplit"
                 class="text-xs ml-1 bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-semibold">Split</span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
               {{ tx.stan || '-' }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              <div *ngIf="tx.customer_name || tx.card_number">
-                <span class="font-medium">{{ tx.customer_name || 'Customer' }}</span>
-                <span class="text-gray-500 ml-1 text-xs" *ngIf="tx.card_number">({{ tx.card_number }})</span>
+              <div *ngIf="tx.customerName || tx.cardNumber">
+                <span class="font-medium">{{ tx.customerName || 'Customer' }}</span>
+                <span class="text-gray-500 ml-1 text-xs" *ngIf="tx.cardNumber">({{ tx.cardNumber }})</span>
               </div>
-              <span *ngIf="!tx.customer_name && !tx.card_number" class="text-gray-400">-</span>
+              <span *ngIf="!tx.customerName && !tx.cardNumber" class="text-gray-400">-</span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm">
-              <span *ngIf="tx.overall_result === 'Success'"
+              <span *ngIf="tx.overallResult === 'Success'"
                 class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                 Success
               </span>
-              <span *ngIf="tx.overall_result === 'Failure' || tx.overall_result === 'Failed'"
+              <span *ngIf="tx.overallResult === 'Failure' || tx.overallResult === 'Failed'"
                 class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
                 Failed
               </span>
-              <span *ngIf="tx.overall_result === 'Partial'"
+              <span *ngIf="tx.overallResult === 'Partial'"
                 class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
                 Partial
               </span>
-              <span *ngIf="tx.overall_result === 'Aborted'"
+              <span *ngIf="tx.overallResult === 'Aborted'"
                 class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-200 text-gray-800">
                 Aborted
               </span>
-              <span *ngIf="!tx.overall_result"
+              <span *ngIf="!tx.overallResult"
                 class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
                 Pending
               </span>
@@ -201,7 +201,7 @@
         <h3 class="text-xl leading-6 font-bold text-gray-900" id="modal-title">
           Transaction Details
           <span *ngIf="selectedTransaction && !selectedTransaction.isGroup" class="text-blue-600">#{{
-            selectedTransaction.request_info.id }}</span>
+            selectedTransaction.requestInfo.id }}</span>
           <span *ngIf="selectedTransaction && selectedTransaction.isGroup" class="text-blue-600">(Grouped Split)</span>
         </h3>
         <button (click)="closeDetails()" class="text-gray-400 hover:text-gray-500 focus:outline-none">
@@ -245,83 +245,83 @@
             </h4>
             <div class="grid grid-cols-2 gap-2 text-sm">
               <div class="text-gray-500">Timestamp:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.request_info.request_timestamp |
+              <div class="font-medium text-gray-900">{{ selectedTransaction.requestInfo.requestTimestamp |
                 date:'short' }}</div>
 
               <div class="text-gray-500">Type:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.request_info.request_type }}</div>
+              <div class="font-medium text-gray-900">{{ selectedTransaction.requestInfo.requestType }}</div>
 
               <div class="text-gray-500">Pop ID:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.request_info.pop_id }}</div>
+              <div class="font-medium text-gray-900">{{ selectedTransaction.requestInfo.popId }}</div>
 
               <div class="text-gray-500">Workstation ID:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.request_info.workstation_id }}</div>
+              <div class="font-medium text-gray-900">{{ selectedTransaction.requestInfo.workstationId }}</div>
             </div>
           </div>
 
           <!-- Response Info -->
           <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
             <h4 class="text-md font-bold text-gray-800 mb-3 border-b pb-2">Response Information</h4>
-            <div class="grid grid-cols-2 gap-2 text-sm" *ngIf="selectedTransaction.response_info; else noData">
+            <div class="grid grid-cols-2 gap-2 text-sm" *ngIf="selectedTransaction.responseInfo; else noData">
               <div class="text-gray-500">Result:</div>
               <div class="font-bold"
-                [ngClass]="{'text-green-600': selectedTransaction.response_info.overall_result === 'Success', 'text-red-600': selectedTransaction.response_info.overall_result !== 'Success'}">
-                {{ selectedTransaction.response_info.overall_result }}
+                [ngClass]="{'text-green-600': selectedTransaction.responseInfo.overallResult === 'Success', 'text-red-600': selectedTransaction.responseInfo.overallResult !== 'Success'}">
+                {{ selectedTransaction.responseInfo.overallResult }}
               </div>
 
               <div class="text-gray-500">Error Condition:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.response_info.error_condition || 'None' }}
+              <div class="font-medium text-gray-900">{{ selectedTransaction.responseInfo.errorCondition || 'None' }}
               </div>
 
               <div class="text-gray-500">Terminal ID:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.response_info.terminal_id || '-' }}</div>
+              <div class="font-medium text-gray-900">{{ selectedTransaction.responseInfo.terminalId || '-' }}</div>
 
               <div class="text-gray-500">STAN:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.response_info.stan || '-' }}</div>
+              <div class="font-medium text-gray-900">{{ selectedTransaction.responseInfo.stan || '-' }}</div>
             </div>
           </div>
 
           <!-- Ticket Reprint Banner -->
-          <div *ngIf="selectedTransaction.request_info.request_type === 'TicketReprint'" class="md:col-span-2 bg-blue-50 border border-blue-200 p-6 rounded-lg text-center shadow-inner mt-4">
+          <div *ngIf="selectedTransaction.requestInfo.requestType === 'TicketReprint'" class="md:col-span-2 bg-blue-50 border border-blue-200 p-6 rounded-lg text-center shadow-inner mt-4">
             <svg class="mx-auto h-12 w-12 text-blue-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
             </svg>
             <h3 class="text-lg font-bold text-blue-900 mb-1">Ticket Reprint Request</h3>
             <p class="text-sm text-blue-700">This request was a command sent to the terminal to reprint a receipt. It does not contain basket or loyalty data.</p>
             <p class="text-sm font-semibold text-blue-800 mt-2">
-                <span *ngIf="selectedTransaction.original_transaction_info">
-                  Original STAN: {{ selectedTransaction.original_transaction_info.stan }} &nbsp;|&nbsp; Original Req ID: {{ selectedTransaction.original_transaction_info.requestId }}
+                <span *ngIf="selectedTransaction.originalTransactionInfo">
+                  Original STAN: {{ selectedTransaction.originalTransactionInfo.stan }} &nbsp;|&nbsp; Original Req ID: {{ selectedTransaction.originalTransactionInfo.requestId }}
                 </span>
             </p>
           </div>
 
           <!-- POS Data -->
-          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200" *ngIf="selectedTransaction.request_info.request_type !== 'TicketReprint'">
+          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200" *ngIf="selectedTransaction.requestInfo.requestType !== 'TicketReprint'">
             <h4 class="text-md font-bold text-gray-800 mb-3 border-b pb-2">POS Data</h4>
-            <div class="grid grid-cols-2 gap-2 text-sm" *ngIf="selectedTransaction.pos_data; else noData">
+            <div class="grid grid-cols-2 gap-2 text-sm" *ngIf="selectedTransaction.posData; else noData">
               <div class="text-gray-500">Card Entry Mode:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.pos_data.card_entry_mode || '-' }}</div>
+              <div class="font-medium text-gray-900">{{ selectedTransaction.posData.cardEntryMode || '-' }}</div>
 
               <div class="text-gray-500">Shift Number:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.pos_data.shift_number || '-' }}</div>
+              <div class="font-medium text-gray-900">{{ selectedTransaction.posData.shiftNumber || '-' }}</div>
 
               <div class="text-gray-500">Clerk ID:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.pos_data.clerk_id || '-' }}</div>
+              <div class="font-medium text-gray-900">{{ selectedTransaction.posData.clerkId || '-' }}</div>
 
 
             </div>
           </div>
 
           <!-- Payment Details -->
-          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200" *ngIf="selectedTransaction.request_info.request_type !== 'TicketReprint' && !selectedTransaction.isGroup">
+          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200" *ngIf="selectedTransaction.requestInfo.requestType !== 'TicketReprint' && !selectedTransaction.isGroup">
             <h4 class="text-md font-bold text-gray-800 mb-3 border-b pb-2">Payment Details</h4>
             <div class="grid grid-cols-2 gap-2 text-sm"
-              *ngIf="selectedTransaction.response_info && (selectedTransaction.response_info.customer_name || selectedTransaction.response_info.card_number); else noPaymentData">
+              *ngIf="selectedTransaction.responseInfo && (selectedTransaction.responseInfo.customerName || selectedTransaction.responseInfo.cardNumber); else noPaymentData">
               <div class="text-gray-500">Customer Name:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.response_info.customer_name || '-' }}</div>
+              <div class="font-medium text-gray-900">{{ selectedTransaction.responseInfo.customerName || '-' }}</div>
 
               <div class="text-gray-500">Card Number:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.response_info.card_number || '-' }}</div>
+              <div class="font-medium text-gray-900">{{ selectedTransaction.responseInfo.cardNumber || '-' }}</div>
             </div>
             <ng-template #noPaymentData>
               <div class="text-sm text-gray-500 italic">No payment card data available.</div>
@@ -329,45 +329,45 @@
           </div>
 
           <!-- Loyalty Data -->
-          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200" *ngIf="selectedTransaction.request_info.request_type !== 'TicketReprint'">
+          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200" *ngIf="selectedTransaction.requestInfo.requestType !== 'TicketReprint'">
             <h4 class="text-md font-bold text-gray-800 mb-3 border-b pb-2">Loyalty Information</h4>
             <div class="grid grid-cols-2 gap-2 text-sm"
-              *ngIf="selectedTransaction.loyalty && selectedTransaction.loyalty.loyalty_flag; else noLoyaltyData">
+              *ngIf="selectedTransaction.loyalty && selectedTransaction.loyalty.loyaltyFlag; else noLoyaltyData">
               <div class="text-gray-500">Card Present:</div>
               <div class="font-medium text-gray-900">Yes</div>
 
               <div class="text-gray-500">Card Number:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.loyalty.loyalty_pan || '-' }}</div>
+              <div class="font-medium text-gray-900">{{ selectedTransaction.loyalty.loyaltyPan || '-' }}</div>
 
               <div class="text-gray-500">Amount:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.loyalty.loyalty_amount || '-' }}</div>
+              <div class="font-medium text-gray-900">{{ selectedTransaction.loyalty.loyaltyAmount || '-' }}</div>
             </div>
           </div>
 
           <!-- Sale Items (Spans full width) -->
-          <div class="md:col-span-2 bg-gray-50 p-4 rounded-lg border border-gray-200" *ngIf="selectedTransaction.request_info.request_type !== 'TicketReprint'">
+          <div class="md:col-span-2 bg-gray-50 p-4 rounded-lg border border-gray-200" *ngIf="selectedTransaction.requestInfo.requestType !== 'TicketReprint'">
             <h4 class="text-md font-bold text-gray-800 mb-3 border-b pb-2">
               Basket & Items
-              <span *ngIf="selectedTransaction.basket_data"
+              <span *ngIf="selectedTransaction.basketData"
                 class="float-right text-blue-600 font-bold ml-4 flex items-center">
-                <div *ngIf="hasDiscount(selectedTransaction.sale_items)"
+                <div *ngIf="hasDiscount(selectedTransaction.saleItems)"
                   class="flex flex-col text-right items-end mr-2 leading-tight">
                   <span class="text-xs line-through text-gray-400 font-normal">{{
-                    getOriginalTotal(selectedTransaction.sale_items) | number:'1.2-2' }} {{
-                    selectedTransaction.basket_data.currency || 'TND' }}</span>
-                  <span class="text-green-600 font-bold">{{ selectedTransaction.basket_data.total_amount }} {{
-                    selectedTransaction.basket_data.currency || 'TND' }}</span>
+                    getOriginalTotal(selectedTransaction.saleItems) | number:'1.2-2' }} {{
+                    selectedTransaction.basketData.currency || 'TND' }}</span>
+                  <span class="text-green-600 font-bold">{{ selectedTransaction.basketData.totalAmount }} {{
+                    selectedTransaction.basketData.currency || 'TND' }}</span>
                 </div>
-                <span *ngIf="!hasDiscount(selectedTransaction.sale_items)" class="mr-2">
-                  {{ selectedTransaction.basket_data.total_amount }} {{ selectedTransaction.basket_data.currency ||
+                <span *ngIf="!hasDiscount(selectedTransaction.saleItems)" class="mr-2">
+                  {{ selectedTransaction.basketData.totalAmount }} {{ selectedTransaction.basketData.currency ||
                   'TND' }}
                 </span>
-                <span *ngIf="selectedTransaction.pos_data?.split"
+                <span *ngIf="selectedTransaction.posData?.split"
                   class="text-xs ml-1 bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-semibold">Split</span>
               </span>
             </h4>
 
-            <div *ngIf="selectedTransaction.sale_items && selectedTransaction.sale_items.length > 0; else noItems">
+            <div *ngIf="selectedTransaction.saleItems && selectedTransaction.saleItems.length > 0; else noItems">
               <table class="min-w-full divide-y divide-gray-200 mt-2 border border-gray-300 rounded-md overflow-hidden">
                 <thead class="bg-gray-100">
                   <tr>
@@ -384,19 +384,19 @@
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                  <tr *ngFor="let item of selectedTransaction.sale_items">
-                    <td class="px-4 py-2 text-sm text-gray-900 font-medium">{{ item.product_code }}</td>
-                    <td class="px-4 py-2 text-sm text-gray-700">{{ item.product_name || '-' }}</td>
+                  <tr *ngFor="let item of selectedTransaction.saleItems">
+                    <td class="px-4 py-2 text-sm text-gray-900 font-medium">{{ item.productCode }}</td>
+                    <td class="px-4 py-2 text-sm text-gray-700">{{ item.productName || '-' }}</td>
                     <td class="px-4 py-2 text-sm text-gray-500">{{ item.quantity }}</td>
-                    <td class="px-4 py-2 text-sm text-green-600 font-medium italic">{{ item.rebate_label || '' }}</td>
+                    <td class="px-4 py-2 text-sm text-green-600 font-medium italic">{{ item.rebateLabel || '' }}</td>
                     <td class="px-4 py-2 text-sm text-gray-900 font-bold text-right">
-                      <div *ngIf="item.rebate_label && item.base_unit_price"
+                      <div *ngIf="item.rebateLabel && item.baseUnitPrice"
                         class="flex flex-col items-end leading-tight">
                         <span class="text-xs line-through text-gray-400 font-normal">{{ getOriginalItemAmount(item) |
                           number:'1.2-2' }}</span>
                         <span class="text-green-600">{{ item.amount }}</span>
                       </div>
-                      <span *ngIf="!item.rebate_label || !item.base_unit_price">
+                      <span *ngIf="!item.rebateLabel || !item.baseUnitPrice">
                         {{ item.amount }}
                       </span>
                     </td>
@@ -432,27 +432,27 @@
             <tbody class="bg-white divide-y divide-gray-200">
               <tr *ngFor="let splitTx of selectedTransaction.groupTransactions">
                 <td class="px-4 py-2 text-sm font-medium text-blue-600">#{{ splitTx.id }}</td>
-                <td class="px-4 py-2 text-sm text-gray-500">{{ splitTx.request_timestamp | date:'short' }}</td>
+                <td class="px-4 py-2 text-sm text-gray-500">{{ splitTx.requestTimestamp | date:'short' }}</td>
                 <td class="px-4 py-2 text-sm text-gray-900">
-                  <div *ngIf="splitTx.customer_name || splitTx.card_number">
-                    <span class="font-medium">{{ splitTx.customer_name || 'Customer' }}</span>
-                    <span class="text-gray-500 ml-1 text-xs" *ngIf="splitTx.card_number">({{ splitTx.card_number
+                  <div *ngIf="splitTx.customerName || splitTx.cardNumber">
+                    <span class="font-medium">{{ splitTx.customerName || 'Customer' }}</span>
+                    <span class="text-gray-500 ml-1 text-xs" *ngIf="splitTx.cardNumber">({{ splitTx.cardNumber
                       }})</span>
                   </div>
-                  <span *ngIf="!splitTx.customer_name && !splitTx.card_number" class="text-gray-400">-</span>
+                  <span *ngIf="!splitTx.customerName && !splitTx.cardNumber" class="text-gray-400">-</span>
                 </td>
-                <td class="px-4 py-2 text-sm text-gray-900 font-bold text-right">{{ splitTx.basket_total }} {{
+                <td class="px-4 py-2 text-sm text-gray-900 font-bold text-right">{{ splitTx.basketTotal }} {{
                   splitTx.currency || 'TND' }}</td>
                 <td class="px-4 py-2 text-sm">
-                  <span *ngIf="splitTx.overall_result === 'Success'"
+                  <span *ngIf="splitTx.overallResult === 'Success'"
                     class="px-2 py-0.5 inline-flex text-xs font-semibold rounded-full bg-green-100 text-green-800">Success</span>
-                  <span *ngIf="splitTx.overall_result === 'Failure' || splitTx.overall_result === 'Failed'"
+                  <span *ngIf="splitTx.overallResult === 'Failure' || splitTx.overallResult === 'Failed'"
                     class="px-2 py-0.5 inline-flex text-xs font-semibold rounded-full bg-red-100 text-red-800">Failed</span>
-                  <span *ngIf="splitTx.overall_result === 'Partial'"
+                  <span *ngIf="splitTx.overallResult === 'Partial'"
                     class="px-2 py-0.5 inline-flex text-xs font-semibold rounded-full bg-orange-100 text-orange-800">Partial</span>
-                  <span *ngIf="splitTx.overall_result === 'Aborted'"
+                  <span *ngIf="splitTx.overallResult === 'Aborted'"
                     class="px-2 py-0.5 inline-flex text-xs font-semibold rounded-full bg-gray-200 text-gray-800">Aborted</span>
-                  <span *ngIf="!splitTx.overall_result"
+                  <span *ngIf="!splitTx.overallResult"
                     class="px-2 py-0.5 inline-flex text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
                 </td>
               </tr>

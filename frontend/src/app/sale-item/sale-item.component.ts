@@ -10,7 +10,7 @@ export class SaleItemComponent {
   @Input() saleItem: SaleItem = {
     productName: '',
     productCode: '',
-    itemAmount: '',
+    amount: '',
     quantity: '',
     taxCode: '',
     addProdCode: '',
@@ -29,7 +29,7 @@ export class SaleItemComponent {
 
   get discountedUnitPrice(): string {
     const qty = parseFloat(this.saleItem.quantity) || 0;
-    const amount = parseFloat(this.saleItem.itemAmount) || 0;
+    const amount = parseFloat(this.saleItem.amount) || 0;
     if (qty > 0) {
       return (amount / qty).toFixed(3);
     }
@@ -40,7 +40,7 @@ export class SaleItemComponent {
     let validatedValue = value !== null && value !== undefined ? value.toString() : '';
 
     // Valider que quantity et unitPrice ne contiennent que des valeurs numériques (positives ou décimales)
-    if (field === 'quantity' || field === 'unitPrice' || field === 'itemAmount') {
+    if (field === 'quantity' || field === 'unitPrice' || field === 'amount') {
       const numericValue = validatedValue.trim();
       if (numericValue === '') {
         validatedValue = '';
@@ -68,7 +68,7 @@ export class SaleItemComponent {
         break;
       case 'quantity':
         this.saleItem.quantity = validatedValue;
-        this.calculateAmount(); // Recalculer itemAmount
+        this.calculateAmount(); // Recalculer amount
         break;
       case 'taxCode':
         this.saleItem.taxCode = validatedValue;
@@ -81,10 +81,10 @@ export class SaleItemComponent {
         break;
       case 'unitPrice':
         this.saleItem.unitPrice = validatedValue;
-        this.calculateAmount(); // Recalculer itemAmount
+        this.calculateAmount(); // Recalculer amount
         break;
-      case 'itemAmount':
-        this.saleItem.itemAmount = validatedValue;
+      case 'amount':
+        this.saleItem.amount = validatedValue;
         this.calculateQuantity(); // Recalculer quantity
         break;
       case 'unitMeasure':
@@ -132,12 +132,12 @@ export class SaleItemComponent {
     const quantity = parseFloat(this.saleItem.quantity) || 0;
     const unitPrice = parseFloat(this.saleItem.unitPrice) || 0;
     const amount = quantity * unitPrice;
-    this.saleItem.itemAmount = amount.toFixed(2); // Arrondir à 2 décimales
-    console.log(`Calculated amount for ${this.saleItem.productName}: quantity=${quantity}, unitPrice=${unitPrice}, itemAmount=${this.saleItem.itemAmount}`);
+    this.saleItem.amount = amount.toFixed(2); // Arrondir à 2 décimales
+    console.log(`Calculated amount for ${this.saleItem.productName}: quantity=${quantity}, unitPrice=${unitPrice}, amount=${this.saleItem.amount}`);
   }
 
   private calculateQuantity() {
-    const amount = parseFloat(this.saleItem.itemAmount) || 0;
+    const amount = parseFloat(this.saleItem.amount) || 0;
     const unitPrice = parseFloat(this.saleItem.unitPrice) || 0;
     if (unitPrice > 0) {
       const quantity = amount / unitPrice;
