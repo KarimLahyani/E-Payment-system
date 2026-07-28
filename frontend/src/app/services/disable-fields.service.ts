@@ -23,11 +23,19 @@ export class DisableFieldsService {
       case 'LoyaltyRedemptionRefund':
       case 'PaymentRefund':
       case 'PreAuth+Fin.Advice':
+        disabledFields.posData.statusRequest = true;
+        disabledFields.posData.posName = true;
+        disabledFields.posData.global = true;
+        disabledFields.posData.longFormat = true;
+        break;
+
       case 'TicketReprint':
         disabledFields.posData.statusRequest = true;
         disabledFields.posData.posName = true;
         disabledFields.posData.global = true;
         disabledFields.posData.longFormat = true;
+        disabledFields.posData.split = true;
+        disabledFields.posData.unattended = true;
         break;
 
       case 'Diagnosis':

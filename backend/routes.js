@@ -219,7 +219,7 @@ const setupRoutes = (app) => {
           updatedRequestData.workId || null,
           updatedRequestData.appSender || null,
           
-          updatedRequestData.stan || null,
+          updatedRequestData.reprintSearchType === 'requestId' ? (updatedRequestData.originalRequestId || null) : (updatedRequestData.stan || null),
         ]
       );
       nextRequestId = requestResult.rows[0].id;
@@ -247,7 +247,7 @@ const setupRoutes = (app) => {
           updatedRequestData.workId || null,
           updatedRequestData.appSender || null,
           
-          updatedRequestData.stan || null,
+          updatedRequestData.reprintSearchType === 'requestId' ? (updatedRequestData.originalRequestId || null) : (updatedRequestData.stan || null),
         ]
       );
       nextRequestId = requestResult.rows[0].id;
@@ -994,8 +994,30 @@ const setupRoutes = (app) => {
         saleItems = itemsResult.rows;
       }
 
+      let originalTransactionInfo = null;
+      if (reqResult.rows[0].request_type === 'TicketReprint' && reqResult.rows[0].stan) {
+        const searchValue = String(reqResult.rows[0].stan).trim();
+        const searchNum = parseInt(searchValue, 10);
+        
+        try {
+          const origResult = await pool.query(
+            `SELECT id, stan FROM response_info WHERE stan = $1 OR id = $2 ORDER BY id DESC LIMIT 1`,
+            [searchValue, isNaN(searchNum) ? -1 : searchNum]
+          );
+          if (origResult.rows.length > 0) {
+            originalTransactionInfo = {
+              stan: origResult.rows[0].stan,
+              requestId: origResult.rows[0].id
+            };
+          }
+        } catch(e) {
+          console.error('Error fetching original transaction for TicketReprint', e);
+        }
+      }
+
       res.status(200).json({
         request_info: reqResult.rows[0],
+        original_transaction_info: originalTransactionInfo,
         response_info: resResult.rows[0] || null,
         pos_data: posResult.rows[0] || null,
         basket_data: basketResult.rows[0] || null,

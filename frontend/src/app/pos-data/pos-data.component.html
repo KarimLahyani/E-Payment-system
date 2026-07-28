@@ -24,10 +24,10 @@
       </div>
 
       <!-- Options (Moved to left column bottom for better balance) -->
-      <div class="pt-2">
+      <div class="pt-2" *ngIf="!posDataDisabledFields['split'] || !posDataDisabledFields['unattended']">
         <label class="block text-sm font-medium text-gray-700 mb-3">POS Options</label>
         <div class="grid grid-cols-2 gap-4">
-          <label class="relative flex items-center justify-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors" [class.bg-blue-50]="posData.split" [class.border-blue-300]="posData.split">
+          <label *ngIf="!posDataDisabledFields['split']" class="relative flex items-center justify-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors" [class.bg-blue-50]="posData.split" [class.border-blue-300]="posData.split">
             <input type="checkbox" [(ngModel)]="posData.split" [disabled]="posDataDisabledFields['split']" (ngModelChange)="onFieldChange()" class="peer sr-only">
             <div class="w-5 h-5 border-2 border-gray-400 rounded mr-3 peer-checked:bg-blue-600 peer-checked:border-blue-600 flex items-center justify-center transition-all">
               <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
@@ -35,7 +35,7 @@
             <span class="text-sm font-medium" [class.text-blue-700]="posData.split" [class.text-gray-700]="!posData.split">Split Bill</span>
           </label>
           
-          <label class="relative flex items-center justify-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors" [class.bg-blue-50]="posData.unattended" [class.border-blue-300]="posData.unattended">
+          <label *ngIf="!posDataDisabledFields['unattended']" class="relative flex items-center justify-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors" [class.bg-blue-50]="posData.unattended" [class.border-blue-300]="posData.unattended">
             <input type="checkbox" [(ngModel)]="posData.unattended" [disabled]="posDataDisabledFields['unattended']" (ngModelChange)="onFieldChange()" class="peer sr-only">
             <div class="w-5 h-5 border-2 border-gray-400 rounded mr-3 peer-checked:bg-blue-600 peer-checked:border-blue-600 flex items-center justify-center transition-all">
               <svg class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>

@@ -2,7 +2,7 @@
   
 
   const state = {
-    cards: loadCards(),
+    cards: [],
     selectedCardId: "acme-fleet-diesel",
     transaction: null,
     terminalMode: "idle",
@@ -110,6 +110,192 @@
       socket.emit('terminal:response', responseXml);
       setScreen(['DIAGNOSIS OK']);
       setTimeout(() => { if (state.terminalMode === 'idle') setScreen(['WELCOME', 'Ready for transaction']); }, 2000);
+      return;
+    }
+
+    if (xmlMessage.includes('RequestType="TicketReprint"')) {
+      const reqId = xmlMessage.match(/RequestID="([^"]+)"/)?.[1] || "123";
+      const popId = xmlMessage.match(/POPID="([^"]+)"/)?.[1] || "01";
+      const workstationId = xmlMessage.match(/WorkstationID="([^"]+)"/)?.[1] || "POS01";
+      const stanToReprint = xmlMessage.match(/STAN="([^"]+)"/)?.[1];
+
+      let receiptPromise;
+
+      if (stanToReprint) {
+        receiptPromise = fetch('http://localhost:3000/api/history?limit=100')
+          .then(r => r.json())
+          .then(data => {
+            const targetIndex = data.transactions.findIndex(t => t.stan === stanToReprint || t.id.toString() === stanToReprint);
+            if (targetIndex === -1) return "TRANSACTION NOT FOUND IN DATABASE";
+            const targetTx = data.transactions[targetIndex];
+
+            if (targetTx.is_split) {
+              // Find contiguous split transactions for this group
+              let startIndex = targetIndex;
+              while (startIndex < data.transactions.length - 1 && data.transactions[startIndex + 1].is_split) startIndex++;
+              let endIndex = targetIndex;
+              while (endIndex > 0 && data.transactions[endIndex - 1].is_split) endIndex--;
+              
+              const splitGroup = data.transactions.slice(endIndex, startIndex + 1).reverse();
+              
+              return Promise.all(splitGroup.map(stx => fetch(`http://localhost:3000/api/history/${stx.id}`).then(r => r.json())))
+                .then(fullTxs => {
+                  const firstTx = fullTxs[0];
+                  const decision = { 
+                    approved: targetTx.overall_result === 'Success', 
+                    authCode: targetTx.auth_code || 'N/A',
+                    reason: targetTx.overall_result === 'Success' ? 'Approved' : 'Declined'
+                  };
+                  const card = { 
+                    name: targetTx.customer_name || 'UNKNOWN', 
+                    number: targetTx.card_number || '**** 0000' 
+                  };
+                  
+                  let items = [];
+                  try {
+                    if (typeof firstTx.basket_data?.sale_items === 'string') {
+                       items = JSON.parse(firstTx.basket_data.sale_items);
+                    } else if (firstTx.sale_items && Array.isArray(firstTx.sale_items)) {
+                       items = firstTx.sale_items.map(i => {
+                         let info = { unitPrice: 0, unitMeasure: '', taxCode: 'A' };
+                         if (typeof i.add_prod_info === 'string') {
+                           const parts = i.add_prod_info.split(';');
+                           if (parts.length > 1 && parts[1].includes('=')) {
+                             const unitParts = parts[1].split('=')[1].split('/');
+                             info.unitPrice = parseFloat(unitParts[0]) || 0;
+                             info.unitMeasure = unitParts[1] || '';
+                           }
+                           if (parts.length > 2 && parts[2].includes('=')) {
+                             info.taxCode = parts[2].split('=')[1].trim();
+                           }
+                         }
+                         return {
+                           productName: i.product_name || i.product_code,
+                           itemAmount: parseFloat(i.amount),
+                           quantity: parseFloat(i.quantity),
+                           unitPrice: info.unitPrice,
+                           unitMeasure: info.unitMeasure,
+                           taxCode: info.taxCode
+                         };
+                       });
+                    }
+                  } catch(e) {}
+                  
+                  const transaction = {
+                    amount: parseFloat(firstTx.basket_data?.total_amount || 0),
+                    currency: firstTx.basket_data?.currency || 'TND',
+                    requestType: firstTx.request_info?.request_type || 'Unknown',
+                    stan: stanToReprint,
+                    items: items,
+                    siteId: 'SITE-0142',
+                    split: true
+                  };
+                  
+                  const splitSession = { payments: [] };
+                  fullTxs.forEach(ftx => {
+                    splitSession.payments.push({
+                      amount: parseFloat(ftx.request_info?.amount || ftx.basket_data?.total_amount || 0),
+                      cardNumber: ftx.response_info?.card_number || '**** 0000',
+                      cardName: ftx.response_info?.customer_name || 'UNKNOWN',
+                      authCode: ftx.response_info?.auth_code || 'N/A',
+                      reason: ftx.response_info?.overall_result === 'Success' ? 'Approved' : 'Declined'
+                    });
+                  });
+
+                  return buildReceipt(decision, card, transaction, splitSession);
+                });
+            } else {
+              return fetch(`http://localhost:3000/api/history/${targetTx.id}`)
+                .then(r => r.json())
+                .then(fullTx => {
+                  const decision = { 
+                    approved: fullTx.response_info?.overall_result === 'Success', 
+                    authCode: fullTx.response_info?.auth_code || 'N/A',
+                    reason: fullTx.response_info?.overall_result === 'Success' ? 'Approved' : 'Declined'
+                  };
+                  const card = { 
+                    name: fullTx.response_info?.customer_name || 'UNKNOWN', 
+                    number: fullTx.response_info?.card_number || '**** 0000' 
+                  };
+                  
+                  let items = [];
+                  try {
+                    if (typeof fullTx.basket_data?.sale_items === 'string') {
+                       items = JSON.parse(fullTx.basket_data.sale_items);
+                    } else if (fullTx.sale_items && Array.isArray(fullTx.sale_items)) {
+                       items = fullTx.sale_items.map(i => {
+                         let info = { unitPrice: 0, unitMeasure: '', taxCode: 'A' };
+                         if (typeof i.add_prod_info === 'string') {
+                           const parts = i.add_prod_info.split(';');
+                           if (parts.length > 1 && parts[1].includes('=')) {
+                             const unitParts = parts[1].split('=')[1].split('/');
+                             info.unitPrice = parseFloat(unitParts[0]) || 0;
+                             info.unitMeasure = unitParts[1] || '';
+                           }
+                           if (parts.length > 2 && parts[2].includes('=')) {
+                             info.taxCode = parts[2].split('=')[1].trim();
+                           }
+                         }
+                         return {
+                           productName: i.product_name || i.product_code,
+                           itemAmount: parseFloat(i.amount),
+                           quantity: parseFloat(i.quantity),
+                           unitPrice: info.unitPrice,
+                           unitMeasure: info.unitMeasure,
+                           taxCode: info.taxCode
+                         };
+                       });
+                    }
+                  } catch(e) {}
+                  
+                  const transaction = {
+                    amount: parseFloat(fullTx.basket_data?.total_amount || 0),
+                    currency: fullTx.basket_data?.currency || 'TND',
+                    requestType: fullTx.request_info?.request_type || 'Unknown',
+                    stan: stanToReprint,
+                    items: items,
+                    siteId: 'SITE-0142'
+                  };
+                  return buildReceipt(decision, card, transaction);
+                });
+            }
+          }).catch(e => {
+            console.error(e);
+            return "ERROR FETCHING FROM DB: " + e.message;
+          });
+      } else {
+        receiptPromise = Promise.resolve(state.lastReceipt || "NO RECEIPT TO REPRINT");
+      }
+
+      const responseXml = `<?xml version="1.0" encoding="ISO-8859-1" standalone="no"?>
+<CardServiceResponse ApplicationSender="TerminalSimulator" POPID="${popId}" RequestID="${reqId}" WorkstationID="${workstationId}" RequestType="TicketReprint" OverallResult="Success" xmlns="http://www.nrf-arts.org/IXRetail/namespace" xmlns:IFSF="http://www.ifsf.org/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.nrf-arts.org/IXRetail/namespace ./IFSF/XSD/CardServiceResponse.xsd">
+  <Terminal>
+    <TerminalID>TERM01</TerminalID>
+    <STAN>${stan()}</STAN>
+    <TerminalBatch>000001</TerminalBatch>
+  </Terminal>
+</CardServiceResponse>`;
+
+      receiptPromise.then(receiptText => {
+        const centerStr = (str, width = 40) => {
+          if (str.length >= width) return str;
+          const leftPadding = Math.floor((width - str.length) / 2);
+          return " ".repeat(leftPadding) + str;
+        };
+        const paddedReprint = centerStr("*** REPRINT ***");
+        send("TERM->APP", 1, "DeviceRequest", {
+          device: "Printer",
+          command: "ReceiptData",
+          text: "\n" + paddedReprint + "\n\n" + receiptText
+        });
+        
+        setTimeout(() => {
+          socket.emit('terminal:response', responseXml);
+          setScreen(['TICKET REPRINT', 'SUCCESS']);
+          setTimeout(() => { if (state.terminalMode === 'idle') setScreen(['WELCOME', 'Ready for transaction']); }, 2000);
+        }, 500);
+      });
+      
       return;
     }
 
@@ -615,6 +801,7 @@
     <PAN>${card.number.slice(0, 6)}******${card.number.slice(-4)}</PAN>
     <ExpiryDate>${card.expiry.replace('-', '')}</ExpiryDate>
     <CustomerName>${card.name}</CustomerName>
+    <AuthCode>${decision.authCode || ''}</AuthCode>
   </Card>${loyaltyXml}${saleItemsXml}
 </CardServiceResponse>`;
 
@@ -657,10 +844,12 @@
         }
 
         if (shouldPrintReceipt) {
+          const receiptText = buildReceipt(decision, card, state.transaction);
+          state.lastReceipt = receiptText;
           send("TERM->APP", 1, "DeviceRequest", {
             device: "Printer",
             command: "ReceiptData",
-            text: buildReceipt(decision, card, state.transaction)
+            text: receiptText
           });
           if (decision.approved && state.splitSession) {
             state.splitSession = null; // Clear session after final receipt
@@ -839,9 +1028,11 @@ ${indent}</${name}>`;
     return requestSql + "\n\n" + responseSql;
   }
 
-  function buildReceipt(decision, card, transaction) {
+  function buildReceipt(decision, card, transaction, optionalSplitSession = null) {
     if (!transaction) return "NO TRANSACTION DATA";
     
+    const sessionToUse = optionalSplitSession || state.splitSession;
+
     const divider = "-".repeat(40);
     const dateStr = new Date().toLocaleString();
     const amountStr = parseFloat(transaction.amount).toFixed(2);
@@ -924,15 +1115,17 @@ ${indent}</${name}>`;
     const subtotalNet = totalGross - totalTax;
     const subtotalStr = subtotalNet.toFixed(2);
     const taxStr = totalTax.toFixed(2);
-    const amountStrFormatted = totalGross.toFixed(2);
+    let finalTotal = totalGross > 0 ? totalGross : parseFloat(transaction.amount || 0);
+    const amountStrFormatted = finalTotal.toFixed(2);
     
     lines.push(lblSubtotal + " ".repeat(40 - lblSubtotal.length - subtotalStr.length) + subtotalStr);
     lines.push(lblTax + " ".repeat(40 - lblTax.length - taxStr.length) + taxStr);
+    lines.push(lblTotal + " ".repeat(40 - lblTotal.length - amountStrFormatted.length) + amountStrFormatted);
     
       lines.push(lblTotal + " ".repeat(40 - lblTotal.length - amountStrFormatted.length) + amountStrFormatted);
       
-      if (transaction.split && state.splitSession && state.splitSession.payments) {
-        state.splitSession.payments.forEach(payment => {
+      if (transaction.split && sessionToUse && sessionToUse.payments) {
+        sessionToUse.payments.forEach(payment => {
           lines.push(divider);
           const pAmount = parseFloat(payment.amount).toFixed(2);
           const lblAmount = isFr ? "MONTANT:" : "AMOUNT:";
@@ -1115,5 +1308,6 @@ ${indent}</${name}>`;
   el.copyDbBtn.addEventListener("click", copyDbPreview);
   el.currencyInput.addEventListener("change", renderCards);
 
+  loadCards();
   resetSimulator();
 })();

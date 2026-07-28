@@ -10,10 +10,10 @@ import { Router } from '@angular/router';
 export class TransactionHistoryComponent implements OnInit {
   transactions: any[] = [];
   isLoading: boolean = true;
-  
+
   // Pagination & Filtering
   page: number = 1;
-  limit: any = 50;
+  limit: any = 10;
   totalCount: number = 0;
   filters: any = {
     startDate: '',
@@ -96,7 +96,7 @@ export class TransactionHistoryComponent implements OnInit {
               }
               currentGroup.stan += tx.stan ? (', ' + tx.stan) : '';
               currentGroup.transactions.push(tx);
-              
+
               // Determine overall result logic for groups (e.g. if any failed, mark partial or failed)
               if (tx.overall_result === 'Failed' && currentGroup.overall_result === 'Success') {
                 currentGroup.overall_result = 'Partial';
@@ -164,10 +164,10 @@ export class TransactionHistoryComponent implements OnInit {
     this.isModalOpen = true;
     this.isLoadingDetails = true;
     this.selectedTransaction = null;
-    
+
     // For grouped splits, fetch the details of the most recent split request (first in the group array)
     const targetId = tx.isGroup ? tx.transactions[0].id : tx.id;
-    
+
     this.requestInfoService.getTransactionDetails(targetId).subscribe({
       next: (data) => {
         this.selectedTransaction = data;
@@ -176,7 +176,7 @@ export class TransactionHistoryComponent implements OnInit {
         if (tx.isGroup) {
           this.selectedTransaction.isGroup = true;
           this.selectedTransaction.groupTransactions = tx.transactions;
-          
+
           // Override the total paid to reflect the sum of all splits in the group
           const groupTotal = tx.transactions.reduce((sum: number, splitTx: any) => {
             if (splitTx.overall_result === 'Success') {

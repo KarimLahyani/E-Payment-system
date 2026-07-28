@@ -18,7 +18,8 @@ export const defaultDisabledFields = {
     serviceLevel: false,
     split: false,
     waitingCard: false,
-    choicePayKind: false
+    choicePayKind: false,
+    unattended: false
   },
   amount: {
     totalAmount: false,
@@ -77,6 +78,7 @@ export interface DisabledFields {
     split: boolean;
     waitingCard: boolean;
     choicePayKind: boolean;
+    unattended: boolean;
   };
   amount: {
     totalAmount: boolean;

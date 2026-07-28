@@ -292,14 +292,15 @@ const processCardServiceResponse = async (responseXML) => {
 
     const cardNumber = cardServiceResponse.Card?.PAN || null;
     const customerName = cardServiceResponse.Card?.CustomerName || null;
+    const authCode = cardServiceResponse.PaymentReceipt?.RequiredSignature?.AuthCode || cardServiceResponse.Card?.AuthCode || cardServiceResponse.Loyalty?.LoyaltyApprovalCode || null;
 
     // Insérer ou mettre à jour response_info
     const resultQuery = await pool.query(
-      `INSERT INTO response_info (id, request_type, overall_result, error_condition, stan, terminal_id, terminal_batch, amount, card_number, customer_name, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+      `INSERT INTO response_info (id, request_type, overall_result, error_condition, stan, terminal_id, terminal_batch, amount, card_number, customer_name, auth_code, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
        ON CONFLICT (id) DO UPDATE 
-       SET request_type = $2, overall_result = $3, error_condition = $4, stan = $5, terminal_id = $6, terminal_batch = $7, amount = $8, card_number = $9, customer_name = $10`,
-      [requestId, requestType, overallResult, errorCondition, stan, terminalId, terminalBatch, totalAmount, cardNumber, customerName]
+       SET request_type = $2, overall_result = $3, error_condition = $4, stan = $5, terminal_id = $6, terminal_batch = $7, amount = $8, card_number = $9, customer_name = $10, auth_code = $11`,
+      [requestId, requestType, overallResult, errorCondition, stan, terminalId, terminalBatch, totalAmount, cardNumber, customerName, authCode]
     );
     console.log(`Successfully inserted CardServiceResponse into response_info: RequestID=${requestId}`);
 

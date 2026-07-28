@@ -7,6 +7,8 @@ export interface RequestData {
   requestId: string;
   requestTimestamp?: string;
   stan: string;
+  reprintSearchType?: 'stan' | 'requestId';
+  originalRequestId?: string;
   clientIp?: string; // Ajouté
   serverIp?: string; // Ajouté
   epsPort?: number;  // Ajouté

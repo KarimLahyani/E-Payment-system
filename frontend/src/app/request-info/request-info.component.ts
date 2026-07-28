@@ -268,7 +268,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     this.requestInfoService.getLastRequestInfo().subscribe(
       (data: RequestData) => {
         this.requestData = { ...this.requestData, ...data };
-        if (this.requestData.requestType !== 'LoyaltyAwardRefund') {
+        if (this.requestData.requestType !== 'LoyaltyAwardRefund' && this.requestData.requestType !== 'TicketReprint') {
           this.requestData.stan = '';
         }
         if (data.clientIp && data.serverIp && data.epsPort && data.posProxyPort !== undefined && data.opiMode !== undefined) {
@@ -637,6 +637,8 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
       workstationId: 'POS01',
       requestId: '',
       stan: '',
+      reprintSearchType: 'stan',
+      originalRequestId: ''
     };
     this.posData = {
       posTimestamp: new Date().toISOString().slice(0, 19),

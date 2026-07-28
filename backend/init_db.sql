@@ -110,6 +110,7 @@ CREATE TABLE IF NOT EXISTS response_info (
     amount VARCHAR(255),
     card_number VARCHAR(255),
     customer_name VARCHAR(255),
+    auth_code VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

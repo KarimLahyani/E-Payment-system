@@ -88,10 +88,30 @@
                   class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">STAN</label>
-                <input type="text" [(ngModel)]="requestData.stan"
-                  [disabled]="requestData.requestType !== 'LoyaltyAwardRefund'"
-                  class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <ng-container *ngIf="requestData.requestType !== 'TicketReprint'">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">STAN</label>
+                  <input type="text" [(ngModel)]="requestData.stan"
+                    [disabled]="requestData.requestType !== 'LoyaltyAwardRefund'"
+                    class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:bg-gray-100">
+                </ng-container>
+
+                <ng-container *ngIf="requestData.requestType === 'TicketReprint'">
+                  <div class="flex items-center justify-between mb-1">
+                    <label class="block text-sm font-medium text-gray-700">Reprint Target</label>
+                    <div class="flex space-x-3 text-xs">
+                      <label class="inline-flex items-center cursor-pointer">
+                        <input type="radio" [(ngModel)]="requestData.reprintSearchType" value="stan" class="form-radio h-3 w-3 text-blue-600">
+                        <span class="ml-1 text-gray-700 font-medium">STAN</span>
+                      </label>
+                      <label class="inline-flex items-center cursor-pointer">
+                        <input type="radio" [(ngModel)]="requestData.reprintSearchType" value="requestId" class="form-radio h-3 w-3 text-blue-600">
+                        <span class="ml-1 text-gray-700 font-medium">Req ID</span>
+                      </label>
+                    </div>
+                  </div>
+                  <input *ngIf="requestData.reprintSearchType === 'stan'" type="text" [(ngModel)]="requestData.stan" placeholder="Original STAN..." class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <input *ngIf="requestData.reprintSearchType === 'requestId'" type="text" [(ngModel)]="requestData.originalRequestId" placeholder="Original Req ID..." class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </ng-container>
               </div>
             </div>
           </div>

@@ -46,8 +46,8 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
   const xmlns = 'xmlns="http://www.nrf-arts.org/IXRetail/namespace" xmlns:IFSF="http://www.ifsf.org/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"';
   let rootTag, schemaLocation, ipAddressAttr = '';
   
-  // Condition pour Login ou Logoff
-  if (requestType === 'Login' || requestType === 'Logoff') {
+  // Condition pour ServiceRequest
+  if (requestType === 'Login' || requestType === 'Logoff' || requestType === 'TicketReprint') {
     rootTag = 'ServiceRequest';
     schemaLocation = 'xsi:schemaLocation="http://www.nrf-arts.org/IXRetail/namespace ./IFSF/XSD/ServiceRequest.xsd"';
     const ipAddress = getLocalIPAddress();
@@ -119,7 +119,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
     const posDataLine6 = `    </POSData>`;
 
     posDataSection = [posDataLine1, posDataLine2, posDataLine3, posDataLine4, posDataLine5, posDataLine6].filter(line => line).join('\n');
-  } else if (requestType === 'Login' || requestType === 'Logoff') {
+  } else if (requestType === 'Login' || requestType === 'Logoff' || requestType === 'TicketReprint') {
     const languageCode = String(posData?.languageCode || 'pt').trim();
     const clerkLevel = String(posData?.clerkLevel || '5').trim();
     const unattended = String(posData?.unattended || 'false').trim();
@@ -167,31 +167,44 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
     if (terminalId && terminalBatch && stan) {
       originalTransactionSection = `    <OriginalTransaction TerminalID="${terminalId}" TerminalBatch="${terminalBatch}" STAN="${stan}"></OriginalTransaction>`;
     }
-  } else if (requestType === 'LoyaltyAwardRefund' && requestData?.stan) {
+  } else if ((requestType === 'LoyaltyAwardRefund' || requestType === 'TicketReprint') && (requestData?.stan || requestData?.originalRequestId)) {
     try {
-      const result = await pool.query(
-        `SELECT terminal_id, terminal_batch 
-         FROM response_info 
-         WHERE request_type = 'LoyaltyAward' 
-         AND stan = $1 
-         ORDER BY id DESC LIMIT 1`,
-        [requestData.stan]
-      );
+      let result;
+      let searchValue;
 
-      let terminalId, terminalBatch;
+      if (requestType === 'TicketReprint' && requestData?.reprintSearchType === 'requestId') {
+        searchValue = String(requestData.originalRequestId).trim();
+        const searchNum = parseInt(searchValue, 10);
+        result = await pool.query(
+          `SELECT terminal_id, terminal_batch, stan 
+           FROM response_info 
+           WHERE id = $1
+           ORDER BY id DESC LIMIT 1`,
+          [isNaN(searchNum) ? -1 : searchNum]
+        );
+      } else {
+        searchValue = String(requestData.stan).trim();
+        result = await pool.query(
+          `SELECT terminal_id, terminal_batch, stan 
+           FROM response_info 
+           WHERE stan = $1 
+           ORDER BY id DESC LIMIT 1`,
+          [searchValue]
+        );
+      }
+
+      let terminalId, terminalBatch, dbStan;
       if (result.rows.length > 0) {
         terminalId = String(result.rows[0].terminal_id || '71044283').trim();
         terminalBatch = String(result.rows[0].terminal_batch || '4711').trim();
+        dbStan = String(result.rows[0].stan || searchValue).trim();
       } else {
         terminalId = '71044283';
         terminalBatch = '4711';
+        dbStan = searchValue;
       }
 
-      const stan = String(requestData.stan || '').trim();
-
-      if (terminalId && terminalBatch && stan) {
-        originalTransactionSection = `    <OriginalTransaction TerminalID="${terminalId}" TerminalBatch="${terminalBatch}" STAN="${stan}"></OriginalTransaction>`;
-      }
+      originalTransactionSection = `    <OriginalTransaction TerminalID="${terminalId}" TerminalBatch="${terminalBatch}" STAN="${dbStan}"></OriginalTransaction>`;
     } catch {
       const terminalId = '71044283';
       const terminalBatch = '4711';

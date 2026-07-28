@@ -281,8 +281,22 @@
             </div>
           </div>
 
+          <!-- Ticket Reprint Banner -->
+          <div *ngIf="selectedTransaction.request_info.request_type === 'TicketReprint'" class="md:col-span-2 bg-blue-50 border border-blue-200 p-6 rounded-lg text-center shadow-inner mt-4">
+            <svg class="mx-auto h-12 w-12 text-blue-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            <h3 class="text-lg font-bold text-blue-900 mb-1">Ticket Reprint Request</h3>
+            <p class="text-sm text-blue-700">This request was a command sent to the terminal to reprint a receipt. It does not contain basket or loyalty data.</p>
+            <p class="text-sm font-semibold text-blue-800 mt-2">
+                <span *ngIf="selectedTransaction.original_transaction_info">
+                  Original STAN: {{ selectedTransaction.original_transaction_info.stan }} &nbsp;|&nbsp; Original Req ID: {{ selectedTransaction.original_transaction_info.requestId }}
+                </span>
+            </p>
+          </div>
+
           <!-- POS Data -->
-          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200" *ngIf="selectedTransaction.request_info.request_type !== 'TicketReprint'">
             <h4 class="text-md font-bold text-gray-800 mb-3 border-b pb-2">POS Data</h4>
             <div class="grid grid-cols-2 gap-2 text-sm" *ngIf="selectedTransaction.pos_data; else noData">
               <div class="text-gray-500">Card Entry Mode:</div>
@@ -299,7 +313,7 @@
           </div>
 
           <!-- Payment Details -->
-          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200" *ngIf="!selectedTransaction.isGroup">
+          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200" *ngIf="selectedTransaction.request_info.request_type !== 'TicketReprint' && !selectedTransaction.isGroup">
             <h4 class="text-md font-bold text-gray-800 mb-3 border-b pb-2">Payment Details</h4>
             <div class="grid grid-cols-2 gap-2 text-sm"
               *ngIf="selectedTransaction.response_info && (selectedTransaction.response_info.customer_name || selectedTransaction.response_info.card_number); else noPaymentData">
@@ -315,7 +329,7 @@
           </div>
 
           <!-- Loyalty Data -->
-          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200" *ngIf="selectedTransaction.request_info.request_type !== 'TicketReprint'">
             <h4 class="text-md font-bold text-gray-800 mb-3 border-b pb-2">Loyalty Information</h4>
             <div class="grid grid-cols-2 gap-2 text-sm"
               *ngIf="selectedTransaction.loyalty && selectedTransaction.loyalty.loyalty_flag; else noLoyaltyData">
@@ -331,7 +345,7 @@
           </div>
 
           <!-- Sale Items (Spans full width) -->
-          <div class="md:col-span-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <div class="md:col-span-2 bg-gray-50 p-4 rounded-lg border border-gray-200" *ngIf="selectedTransaction.request_info.request_type !== 'TicketReprint'">
             <h4 class="text-md font-bold text-gray-800 mb-3 border-b pb-2">
               Basket & Items
               <span *ngIf="selectedTransaction.basket_data"
