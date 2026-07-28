@@ -30,6 +30,7 @@ interface ResponseInfo {
         value: string;
       };
     };
+    saleItem?: any[];
   };
 }
 
@@ -221,22 +222,25 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
   private initializeSaleItems() {
     this.requestInfoService.getProducts().subscribe(
       (products) => {
-        this.basketData.saleItems = products.map(product => ({
-          productName: product.productName,
-          productCode: product.productCode,
-          itemAmount: '',
-          quantity: '',
-          taxCode: product.taxCode,
-          addProdCode: '',
-          reverseSale: '',
-          unitPrice: product.unitPrice,
-          unitMeasure: product.unitMeasure,
-          saleChannel: '',
-          rebateLabel: '',
-          addProdInfo: '',
-          isSelected: false,
-          createdAt: ''
-        }));
+        this.basketData.saleItems = products.map(product => {
+          const existing = this.basketData.saleItems?.find(i => i.productCode === product.productCode);
+          return {
+            productName: product.productName,
+            productCode: product.productCode,
+            itemAmount: existing?.itemAmount || '',
+            quantity: existing?.quantity || '',
+            taxCode: product.taxCode,
+            addProdCode: existing?.addProdCode || '',
+            reverseSale: existing?.reverseSale || '',
+            unitPrice: product.unitPrice,
+            unitMeasure: product.unitMeasure,
+            saleChannel: existing?.saleChannel || '',
+            rebateLabel: existing?.rebateLabel || '',
+            addProdInfo: existing?.addProdInfo || '',
+            isSelected: existing?.isSelected || false,
+            createdAt: existing?.createdAt || ''
+          };
+        });
         this.requestInfoService.updateData({ basketData: this.basketData });
         console.log('Successfully initialized sale items from products catalog', this.basketData.saleItems);
       },
@@ -432,7 +436,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
         } else {
           this.isLoading = false;
           this.activeResponseRequestId = null;
-          alert("Données envoyées avec succès, mais aucun ID de requête retourné.");
+          // alert("Données envoyées avec succès, mais aucun ID de requête retourné.");
         }
         this.cdr.detectChanges();
       },
@@ -442,7 +446,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
 
         this.isLoading = false;
         this.activeResponseRequestId = null;
-        alert("Échec de l'envoi des données.");
+        // alert("Échec de l'envoi des données.");
         this.cdr.detectChanges();
       }
     );
@@ -460,7 +464,6 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
           } else {
             this.requestData.stan = '';
             console.warn('No previous LoyaltyAward response found to set stan.');
-            alert('Aucune réponse LoyaltyAward précédente trouvée. Veuillez d\'abord envoyer une requête LoyaltyAward et vérifier la réponse.');
           }
           this.requestInfoService.updateData({ requestData: this.requestData });
           this.cdr.detectChanges();
@@ -469,7 +472,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
           console.error('Error fetching last LoyaltyAward stan:', error);
           this.requestData.stan = '';
           this.requestInfoService.updateData({ requestData: this.requestData });
-          alert('Erreur lors de la récupération du dernier STAN pour LoyaltyAward.');
+          // alert('Erreur lors de la récupération du dernier STAN pour LoyaltyAward.');
           this.cdr.detectChanges();
         }
       );
@@ -546,7 +549,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
           } else {
             this.isLoading = false;
             this.activeResponseRequestId = null;
-            alert("Données avec Bonus Card envoyées avec succès !");
+            // alert("Données avec Bonus Card envoyées avec succès !");
           }
           this.cdr.detectChanges();
         },
@@ -556,13 +559,13 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
 
           this.isLoading = false;
           this.activeResponseRequestId = null;
-          alert("Échec de l'envoi des données avec Bonus Card.");
+          // alert("Échec de l'envoi des données avec Bonus Card.");
           this.cdr.detectChanges();
         }
       );
     } else {
       console.log('Bonus button clicked, but requestType is not LoyaltyAward or LoyaltyAwardRefund:', this.requestData.requestType);
-      alert('Le bouton Bonus est uniquement disponible pour LoyaltyAward ou LoyaltyAwardRefund.');
+      // alert('Le bouton Bonus est uniquement disponible pour LoyaltyAward ou LoyaltyAwardRefund.');
     }
   }
 
@@ -745,12 +748,38 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
         this.pollingInterval = null;
       }
 
-      if (data && data.cardServiceResponse?.attributes?.overallResult === 'Success' && this.posData.split && amountToSend) {
-        this.paidAmount += parseFloat(amountToSend);
-        if (this.remainingBalance <= 0) {
-          this.posData.split = false;
-          this.paidAmount = 0;
-          this.requestInfoService.updateData({ posData: this.posData });
+      if (data && data.cardServiceResponse?.attributes?.overallResult === 'Success') {
+        const isLoyaltyAward = data.cardServiceResponse.attributes.requestType === 'LoyaltyAward';
+        
+        if (isLoyaltyAward) {
+          const tenderAmount = data.cardServiceResponse.tender?.totalAmount;
+          const saleItems = data.cardServiceResponse.saleItem || [];
+          
+          if (tenderAmount) {
+            this.basketData.totalAmount = typeof tenderAmount === 'object' ? tenderAmount.value : tenderAmount;
+          }
+          
+          if (saleItems && saleItems.length > 0) {
+            saleItems.forEach((incomingItem: any) => {
+              const matchedItem = this.basketData.saleItems.find(bItem => bItem.productCode === incomingItem.productCode);
+              if (matchedItem) {
+                matchedItem.itemAmount = incomingItem.amount || matchedItem.itemAmount;
+                matchedItem.rebateLabel = incomingItem.rebateLabel || matchedItem.rebateLabel;
+              }
+            });
+          }
+          
+          this.requestInfoService.updateData({ basketData: this.basketData });
+          // alert("Discounts applied! Please select CardPayment and click Send to complete the transaction.");
+        }
+        
+        if (this.posData.split && amountToSend) {
+          this.paidAmount += parseFloat(amountToSend);
+          if (this.remainingBalance <= 0) {
+            this.posData.split = false;
+            this.paidAmount = 0;
+            this.requestInfoService.updateData({ posData: this.posData });
+          }
         }
       }
 
@@ -800,7 +829,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
         this.isLoading = false;
         this.activeResponseRequestId = null;
         this.cdr.detectChanges();
-        alert("Timeout en attendant la réponse de l'EPS (120s).");
+        // alert("Timeout en attendant la réponse de l'EPS (120s).");
       }
     };
 

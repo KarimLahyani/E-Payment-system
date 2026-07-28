@@ -15,33 +15,33 @@ async function handleLoyaltyAwardRefund(stan, currentRequestId) {
     const loyaltyAwardRequestId = loyaltyAwardResponse.id;
     console.log(`Found LoyaltyAward response with id: ${loyaltyAwardRequestId}, stan: ${stan}`);
 
-    // Step 2: Find all amount_data entries for the LoyaltyAward request
+    // Step 2: Find all basket_data entries for the LoyaltyAward request
     const highestAmountData = await dbRepository.getHighestAmountDataForRequest(loyaltyAwardRequestId);
 
     if (!highestAmountData) {
-      console.error(`No amount_data found for LoyaltyAward request id: ${loyaltyAwardRequestId}`);
+      console.error(`No basket_data found for LoyaltyAward request id: ${loyaltyAwardRequestId}`);
       return { success: false, message: 'No amount data found for the LoyaltyAward request.' };
     }
 
-    const originalAmountDataId = highestAmountData.id;
+    const originalbasketDataId = highestAmountData.id;
     const originalTotalAmount = highestAmountData.total_amount;
     const preAuthAmount = highestAmountData.pre_auth_amount || '';
     const currency = highestAmountData.currency || 'TND';
     const itemDetails = highestAmountData.item_details || {};
-    console.log(`Highest total_amount found: ${originalTotalAmount} with amount_data.id: ${originalAmountDataId}`);
+    console.log(`Highest total_amount found: ${originalTotalAmount} with basket_data.id: ${originalbasketDataId}`);
 
-    // Step 3: Insert a new row in amount_data with the original total_amount
-    const newAmountDataId = await dbRepository.insertAmountData({
+    // Step 3: Insert a new row in basket_data with the original total_amount
+    const newbasketDataId = await dbRepository.insertAmountData({
       totalAmount: originalTotalAmount,
       preAuthAmount,
       currency,
       itemDetails
     }, currentRequestId);
     
-    console.log(`Successfully inserted new row in amount_data with id ${newAmountDataId} and total_amount ${originalTotalAmount} for request_info_id ${currentRequestId}`);
+    console.log(`Successfully inserted new row in basket_data with id ${newbasketDataId} and total_amount ${originalTotalAmount} for request_info_id ${currentRequestId}`);
 
-    // Step 4: Copy the original sale items to the new amount_data
-    const originalSaleItems = await dbRepository.getSaleItemsByAmountDataId(originalAmountDataId);
+    // Step 4: Copy the original sale items to the new basket_data
+    const originalSaleItems = await dbRepository.getSaleItemsBybasketDataId(originalbasketDataId);
 
     // Map original items to new format for insertion
     const itemsToInsert = originalSaleItems.map(item => ({
@@ -61,8 +61,8 @@ async function handleLoyaltyAwardRefund(stan, currentRequestId) {
       isSelected: item.is_selected || false
     }));
 
-    await dbRepository.insertSaleItems(itemsToInsert, newAmountDataId);
-    console.log(`Restored ${itemsToInsert.length} original sale_items for amount_data_id ${newAmountDataId}`);
+    await dbRepository.insertSaleItems(itemsToInsert, newbasketDataId);
+    console.log(`Restored ${itemsToInsert.length} original sale_items for basket_data_id ${newbasketDataId}`);
 
     return { success: true, message: 'LoyaltyAwardRefund successfully handled.' };
   } catch (error) {

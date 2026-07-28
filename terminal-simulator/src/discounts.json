@@ -1,0 +1,17 @@
+{
+  "Premium Loyalty": {
+    "discountPercentage": 15.0,
+    "rebateLabel": "Premium Reward - 15% Off",
+    "applicableProducts": ["101", "102"]
+  },
+  "Standard Corporate": {
+    "discountPercentage": 10.0,
+    "rebateLabel": "Corporate Rate - 10% Off",
+    "applicableProducts": ["101"]
+  },
+  "Fleet Basic": {
+    "discountPercentage": 5.0,
+    "rebateLabel": "Fleet Discount - 5% Off",
+    "applicableProducts": ["101", "102"]
+  }
+}

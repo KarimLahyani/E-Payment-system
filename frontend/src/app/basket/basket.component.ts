@@ -54,10 +54,7 @@ export class BasketComponent implements OnInit, OnDestroy {
     }
     
     this.initializeSaleItems();
-    // loadLastSaleItems will be called inside initializeSaleItems to avoid race conditions
-    this.updateDisplayedItems();
     this.subscribeToDataChanges();
-    this.updateBasketData();
   }
 
   ngOnDestroy(): void {
@@ -205,6 +202,16 @@ export class BasketComponent implements OnInit, OnDestroy {
   selectItem(item: SaleItem) {
     const updatedItem = this.saleItemsList.find(i => i.productName === item.productName);
     if (updatedItem) {
+      this.selectedSaleItem = { ...updatedItem };
+    } else {
+      this.selectedSaleItem = null;
+    }
+  }
+
+  toggleItemSelection(item: SaleItem, event: Event) {
+    event.stopPropagation();
+    const updatedItem = this.saleItemsList.find(i => i.productName === item.productName);
+    if (updatedItem) {
       updatedItem.isSelected = !updatedItem.isSelected;
       
       // Default quantity to 1 if selected and quantity is empty/0
@@ -215,14 +222,13 @@ export class BasketComponent implements OnInit, OnDestroy {
           const unitPrice = parseFloat(updatedItem.unitPrice) || 0;
           updatedItem.itemAmount = (1 * unitPrice).toFixed(2);
         }
-      } else {
-        // Optionally clear quantity if deselected, but usually better to leave it.
       }
       
-      this.selectedSaleItem = { ...updatedItem };
+      if (this.selectedSaleItem?.productName === updatedItem.productName) {
+        this.selectedSaleItem = { ...updatedItem };
+      }
+      
       this.updateBasketData();
-    } else {
-      this.selectedSaleItem = null;
     }
   }
 
@@ -252,12 +258,14 @@ export class BasketComponent implements OnInit, OnDestroy {
     this.requestInfoService.updateData({ basketData: this.basketData });
   }
 
-  private updateBasketData() {
+  private updateBasketData(recalculateTotal: boolean = true) {
     this.basketData.saleItems = [...this.saleItemsList];
-    const total = this.saleItemsList
-      .filter(item => item.isSelected)
-      .reduce((sum, item) => sum + (parseFloat(item.itemAmount) || 0), 0);
-    this.basketData.totalAmount = total.toFixed(2);
+    if (recalculateTotal) {
+      const total = this.saleItemsList
+        .filter(item => item.isSelected)
+        .reduce((sum, item) => sum + (parseFloat(item.itemAmount) || 0), 0);
+      this.basketData.totalAmount = total.toFixed(2);
+    }
     console.log('Updated totalAmount (updateBasketData):', this.basketData.totalAmount);
     console.log('basketData avant envoi au service:', JSON.stringify(this.basketData, null, 2));
     this.requestInfoService.updateData({ basketData: this.basketData });
@@ -331,7 +339,7 @@ export class BasketComponent implements OnInit, OnDestroy {
             this.selectedSaleItem = null;
             this.updateDisplayedItems();
           }
-          this.updateBasketData();
+          this.updateBasketData(false);
           console.log('saleItemsList après mise à jour via dataChange$:', JSON.stringify(this.saleItemsList, null, 2));
           console.log('basketData.saleItems après mise à jour via dataChange$:', JSON.stringify(this.basketData.saleItems, null, 2));
         }

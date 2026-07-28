@@ -287,9 +287,7 @@ const processCardServiceResponse = async (responseXML) => {
     const tenderCurrency = rawTotalAmount?.['$']?.Currency || 'TND';
     const currencyLogos = { EUR: '€', USD: '$', GBP: '£', TND: 'TND' };
     const currencyLogo = currencyLogos[tenderCurrency] || tenderCurrency;
-    if (totalAmount !== '0') {
-      totalAmount = `${totalAmount} ${currencyLogo}`;
-    }
+    
     console.log(`Extracted totalAmount: ${totalAmount}, Raw TotalAmount object: ${JSON.stringify(cardServiceResponse.Tender?.TotalAmount)}`);
 
     const cardNumber = cardServiceResponse.Card?.PAN || null;
@@ -320,28 +318,27 @@ const processCardServiceResponse = async (responseXML) => {
     }
     const requestInfoId = requestInfoResult.rows[0].id;
 
-    // Trouver la dernière entrée amount_data
+    // Trouver la dernière entrée basket_data
     const amountResult = await pool.query(
-      'SELECT id, total_amount, pre_auth_amount, currency, item_details FROM amount_data WHERE request_info_id = $1 ORDER BY created_at DESC LIMIT 1',
+      'SELECT id, total_amount, pre_auth_amount, currency FROM basket_data WHERE request_info_id = $1 ORDER BY created_at DESC LIMIT 1',
       [requestInfoId]
     );
     if (amountResult.rows.length === 0) {
-      console.error('No amount_data found for request_info_id:', requestInfoId);
+      console.error('No basket_data found for request_info_id:', requestInfoId);
       return;
     }
-    const amountDataId = amountResult.rows[0].id;
+    const basketDataId = amountResult.rows[0].id;
     const originalTotalAmount = amountResult.rows[0].total_amount;
     const preAuthAmount = amountResult.rows[0].pre_auth_amount || '';
     const currency = amountResult.rows[0].currency || 'TND';
-    const itemDetails = amountResult.rows[0].item_details || {};
 
-    // Insérer une nouvelle ligne dans amount_data avec le nouveau totalAmount
+    // Insérer une nouvelle ligne dans basket_data avec le nouveau totalAmount
     const newAmountResult = await pool.query(
-      'INSERT INTO amount_data (total_amount, pre_auth_amount, currency, item_details, request_info_id, created_at) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP) RETURNING id',
-      [totalAmount, preAuthAmount, currency, JSON.stringify(itemDetails), requestInfoId]
+      'INSERT INTO basket_data (total_amount, pre_auth_amount, currency, request_info_id, created_at) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP) RETURNING id',
+      [totalAmount, preAuthAmount, currency, requestInfoId]
     );
-    const newAmountDataId = newAmountResult.rows[0].id;
-    console.log(`Inserted new row in amount_data with id ${newAmountDataId} et total_amount ${totalAmount} pour request_info_id ${requestInfoId}`);
+    const newbasketDataId = newAmountResult.rows[0].id;
+    console.log(`Inserted new row in basket_data with id ${newbasketDataId} et total_amount ${totalAmount} pour request_info_id ${requestInfoId}`);
 
     // Traiter les sale_items avec remise
     const saleItems = cardServiceResponse.SaleItem
@@ -352,28 +349,28 @@ const processCardServiceResponse = async (responseXML) => {
     console.log('SaleItems extracted from response:', JSON.stringify(saleItems, null, 2));
 
     const originalSaleItemsResult = await pool.query(
-      'SELECT * FROM sale_items WHERE amount_data_id = $1',
-      [amountDataId]
+      'SELECT * FROM sale_items WHERE basket_data_id = $1',
+      [basketDataId]
     );
     const originalSaleItems = originalSaleItemsResult.rows.reduce((acc, item) => {
-      acc[item.item_id] = item;
+      acc[item.product_code] = item;
       return acc;
     }, {});
     console.log('Original sale items:', JSON.stringify(originalSaleItems, null, 2));
 
     const saleItemsQuery = `
-      INSERT INTO sale_items (amount_data_id, item_id, button_label, product_code, amount, quantity, tax_code, add_prod_code, reverse_sale, unit_price, unit_measure, sale_channel, rebate_label, add_prod_info, is_selected, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
+      INSERT INTO sale_items (basket_data_id, product_code, amount, quantity, add_prod_code, reverse_sale, sale_channel, rebate_label, add_prod_info, pump_id, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
       RETURNING *
     `;
 
     for (const saleItem of saleItems) {
-      const itemId = saleItem['$']?.ItemID || saleItem.ItemID;
-      console.log(`Processing SaleItem with ItemID=${itemId}, Raw SaleItem:`, JSON.stringify(saleItem, null, 2));
+      const productCode = saleItem.ProductCode?._ || saleItem.ProductCode || '';
+      console.log(`Processing SaleItem with ProductCode=${productCode}, Raw SaleItem:`, JSON.stringify(saleItem, null, 2));
 
-      const originalItem = originalSaleItems[itemId];
+      const originalItem = originalSaleItems[productCode];
       if (!originalItem) {
-        console.error(`Original sale item with item_id ${itemId} not found for amount_data_id ${amountDataId}`);
+        console.error(`Original sale item with product_code ${productCode} not found for basket_data_id ${basketDataId}`);
         continue;
       }
 
@@ -381,7 +378,7 @@ const processCardServiceResponse = async (responseXML) => {
       const discountedAmountRaw = saleItem.Amount?._ || saleItem.Amount;
       let discountedAmount = parseFloat(discountedAmountRaw) || 0;
       const rebateLabel = saleItem.RebateLabel?._ || saleItem.RebateLabel || '';
-      console.log(`Extracted discountedAmount for ItemID=${itemId}: ${discountedAmountRaw} (parsed as ${discountedAmount}), RebateLabel: ${rebateLabel}`);
+      console.log(`Extracted discountedAmount for ProductCode=${productCode}: ${discountedAmountRaw} (parsed as ${discountedAmount}), RebateLabel: ${rebateLabel}`);
 
       let newUnitPrice, newAmount;
       const originalQuantity = parseFloat(originalItem.quantity) || 1;
@@ -392,31 +389,26 @@ const processCardServiceResponse = async (responseXML) => {
         newAmount = discountedAmount; // Le discountedAmount est déjà le total pour cet item
       } else {
         // Si aucune remise n'est appliquée, conserver les valeurs originales
-        console.log(`No discount applied for ItemID=${itemId}, using original values`);
+        console.log(`No discount applied for ProductCode=${productCode}, using original values`);
         newUnitPrice = parseFloat(originalItem.unit_price) || parseFloat(originalItem.amount) / originalQuantity || 0;
         newAmount = parseFloat(originalItem.amount) || newUnitPrice * originalQuantity;
       }
 
       const saleItemValues = [
-        newAmountDataId,
-        itemId,
-        originalItem.button_label || '',
+        newbasketDataId,
         originalItem.product_code || '',
         newAmount.toString(),
         originalItem.quantity || '',
-        originalItem.tax_code || '',
         originalItem.add_prod_code || '',
         originalItem.reverse_sale || '0',
-        newUnitPrice.toString(),
-        originalItem.unit_measure || '',
         originalItem.sale_channel || '',
         rebateLabel,
         originalItem.add_prod_info || '',
-        originalItem.is_selected || false,
+        originalItem.pump_id || '01'
       ];
 
       await pool.query(saleItemsQuery, saleItemValues);
-      console.log(`Inserted new sale_item ${itemId} with amount ${newAmount}, unit_price ${newUnitPrice}, and rebate_label ${rebateLabel} for amount_data_id ${newAmountDataId}`);
+      console.log(`Inserted new sale_item ${productCode} with amount ${newAmount}, unit_price ${newUnitPrice}, and rebate_label ${rebateLabel} for basket_data_id ${newbasketDataId}`);
     }
   } catch (error) {
     console.error(`Error processing CardServiceResponse: ${error.message}`);

@@ -13,6 +13,9 @@
     splitSession: null
   };
 
+  let discountConfig = {};
+  fetch('src/discounts.json').then(r => r.json()).then(data => discountConfig = data).catch(e => console.error("Could not load discounts", e));
+
   const el = {
     connectionStatus: document.querySelector("#connectionStatus"),
     saleForm: document.querySelector("#saleForm"),
@@ -111,6 +114,8 @@
     }
 
     if (xmlMessage.includes('CardServiceRequest')) {
+      const reqTypeMatch = xmlMessage.match(/RequestType="([^"]+)"/);
+      const reqType = reqTypeMatch ? reqTypeMatch[1] : 'CardPayment';
       const amountMatch = xmlMessage.match(/<TotalAmount[^>]*>([\d\.]+)<\/TotalAmount>/);
       const amount = amountMatch ? parseFloat(amountMatch[1]) : 0;
       const isManual = xmlMessage.includes('CardEntryMode="Typed Card Number"');
@@ -132,16 +137,19 @@
         const quantity = parseFloat((itemXml.match(/<Quantity[^>]*>([\d\.]+)<\/Quantity>/) || [])[1] || 1);
         const unitPrice = parseFloat((itemXml.match(/<UnitPrice[^>]*>([\d\.]+)<\/UnitPrice>/) || [])[1] || 0);
         const unitMeasure = (itemXml.match(/<UnitMeasure[^>]*>([^<]+)<\/UnitMeasure>/) || [])[1] || 'L';
-        const itemAmount = parseFloat((itemXml.match(/<ItemAmount[^>]*>([\d\.]+)<\/ItemAmount>/) || [])[1] || (quantity * unitPrice));
+        const itemAmountMatch = itemXml.match(/<(?:Item)?Amount[^>]*>([\d\.]+)<\/(?:Item)?Amount>/);
+        const itemAmount = parseFloat(itemAmountMatch ? itemAmountMatch[1] : (quantity * unitPrice));
         const pumpId = (itemXml.match(/<OutdoorPosition[^>]*>([^<]+)<\/OutdoorPosition>/) || [])[1] || null;
         const taxCode = (itemXml.match(/<TaxCode[^>]*>([^<]+)<\/TaxCode>/) || [])[1] || 'A';
+        const itemId = (itemXml.match(/ItemID="([^"]+)"/) || [])[1] || `i${items.length + 1}`;
         
-        items.push({ productName, productCode, quantity, unitPrice, unitMeasure, itemAmount, pumpId, taxCode });
+        items.push({ itemId, productName, productCode, quantity, unitPrice, unitMeasure, itemAmount, pumpId, taxCode });
       }
 
       state.transaction = {
         id: requestId,
         type: 'Sale',
+        requestType: reqType,
         amount,
         basketTotal: parsedBasketTotal,
         currency: 'TND',
@@ -489,6 +497,7 @@
     if (state.insertedCardId === "manual") {
       card = {
         name: "Manual Card",
+        card_type: "Manual",
         status: "ACTIVE",
         passcode: "1234",
         balance: 999999,
@@ -515,10 +524,10 @@
     window.setTimeout(() => {
       const decision = decide(card, state.transaction, state.codeBuffer);
       const finalMode = decision.approved ? "approved" : "declined";
-      if (decision.approved && state.transaction.type === 'Sale') {
+      if (decision.approved && state.transaction.type === 'Sale' && state.transaction.requestType !== 'LoyaltyAward') {
         card.balance -= state.transaction.amount;
         fetch(`http://localhost:3000/api/cards/${card.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ balance: card.balance }) }).catch(console.error);
-      } else if (decision.approved && state.transaction.type === 'Refund') {
+      } else if (decision.approved && state.transaction.type === 'Refund' && state.transaction.requestType !== 'LoyaltyAwardRefund') {
         card.balance += state.transaction.amount;
         fetch(`http://localhost:3000/api/cards/${card.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ balance: card.balance }) }).catch(console.error);
       }
@@ -544,24 +553,75 @@
       const workstationId = currentRequestXml.match(/WorkstationID="([^"]+)"/)?.[1] || "POS01";
 
       const errorAttr = !decision.approved ? ` ErrorCondition="${decision.reason || 'Card Declined'}"` : '';
+      
+      const isLoyalty = state.transaction.requestType === 'LoyaltyAward';
+      let totalAmount = state.transaction.amount;
+      let loyaltyXml = '';
+      let saleItemsXml = '';
+
+      if (isLoyalty && decision.approved) {
+        let discountInfo = discountConfig[card.card_type];
+        if (discountInfo) {
+          let discountPercentage = discountInfo.discountPercentage || 0;
+          let applicableProducts = discountInfo.applicableProducts || [];
+          let totalDiscount = 0;
+          
+          if (state.transaction.items && state.transaction.items.length > 0) {
+            saleItemsXml = state.transaction.items.map(item => {
+              let originalItemAmount = (item.quantity && item.unitPrice) ? (item.quantity * item.unitPrice) : item.itemAmount;
+              let isApplicable = applicableProducts.length === 0 || applicableProducts.includes(item.productCode);
+              
+              let itemDiscount = isApplicable ? originalItemAmount * (discountPercentage / 100) : 0;
+              let newItemAmount = originalItemAmount - itemDiscount;
+              
+              // Round to 2 decimal places to prevent floating point mismatch with the frontend
+              newItemAmount = parseFloat(newItemAmount.toFixed(2));
+              
+              let rebateLabelXml = isApplicable ? `\n    <RebateLabel>${discountInfo.rebateLabel}</RebateLabel>` : '';
+              
+              item.itemAmount = newItemAmount;
+              
+              return `
+  <SaleItem ItemID="${item.itemId}">
+    <ProductCode>${item.productCode}</ProductCode>
+    <Amount>${newItemAmount.toFixed(2)}</Amount>${rebateLabelXml}
+  </SaleItem>`;
+            }).join('');
+            
+            let newTotalAmount = state.transaction.items.reduce((sum, item) => sum + item.itemAmount, 0);
+            state.transaction.amount = newTotalAmount.toFixed(2);
+            totalAmount = state.transaction.amount;
+          }
+          
+          const loyaltyDate = new Date().toISOString().substring(0, 19);
+          loyaltyXml = `
+  <Loyalty CardCircuit="${card.card_type}" CardEntryMode="Swipe" LoyaltyTimeStamp="${loyaltyDate}">
+    <LoyaltyCard>3B3730353638343032313935343132373738363D333031303536353030303030383030303030</LoyaltyCard>
+    <LoyaltyApprovalCode>${decision.authCode || '123456'}</LoyaltyApprovalCode>
+  </Loyalty>`;
+        }
+      }
 
       const finalResponseXml = `<?xml version="1.0" encoding="ISO-8859-1" standalone="no"?>
-<CardServiceResponse ApplicationSender="TerminalSimulator" POPID="${popId}" RequestID="${reqId}" WorkstationID="${workstationId}" RequestType="CardPayment" OverallResult="${decision.approved ? "Success" : "Failure"}"${errorAttr} xmlns="http://www.nrf-arts.org/IXRetail/namespace" xmlns:IFSF="http://www.ifsf.org/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.nrf-arts.org/IXRetail/namespace ./IFSF/XSD/CardServiceResponse.xsd">
+<CardServiceResponse ApplicationSender="TerminalSimulator" POPID="${popId}" RequestID="${reqId}" WorkstationID="${workstationId}" RequestType="${state.transaction.requestType || 'CardPayment'}" OverallResult="${decision.approved ? "Success" : "Failure"}"${errorAttr} xmlns="http://www.nrf-arts.org/IXRetail/namespace" xmlns:IFSF="http://www.ifsf.org/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.nrf-arts.org/IXRetail/namespace ./IFSF/XSD/CardServiceResponse.xsd">
   <Terminal>
     <TerminalID>TERM01</TerminalID>
     <STAN>${state.transaction.stan}</STAN>
   </Terminal>
   <Tender>
-    <TotalAmount>${state.transaction.amount}</TotalAmount>
+    <TotalAmount>${totalAmount}</TotalAmount>
   </Tender>
   <Card>
     <PAN>${card.number.slice(0, 6)}******${card.number.slice(-4)}</PAN>
     <ExpiryDate>${card.expiry.replace('-', '')}</ExpiryDate>
     <CustomerName>${card.name}</CustomerName>
-  </Card>
+  </Card>${loyaltyXml}${saleItemsXml}
 </CardServiceResponse>`;
 
         let shouldPrintReceipt = true;
+        if (state.transaction.requestType === 'LoyaltyAward') {
+          shouldPrintReceipt = false;
+        }
         
         if (state.transaction.split) {
           if (!state.splitSession || state.splitSession.basketTotal !== state.transaction.basketTotal) {

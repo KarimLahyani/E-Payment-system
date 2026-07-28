@@ -33,14 +33,16 @@
       <button 
         *ngFor="let item of displayedItems" 
         [ngClass]="{
-          'bg-green-600': item.isSelected && item.productName !== selectedSaleItem?.productName,
-          'bg-green-700 ring-2 ring-blue-500': item.isSelected && item.productName === selectedSaleItem?.productName,
-          'bg-gray-400 text-gray-800': !item.isSelected && item.productName !== selectedSaleItem?.productName,
-          'bg-gray-500 text-white ring-2 ring-blue-500': !item.isSelected && item.productName === selectedSaleItem?.productName
+          'bg-green-600 text-white': item.isSelected && item.productName !== selectedSaleItem?.productName,
+          'bg-green-700 text-white ring-2 ring-blue-500': item.isSelected && item.productName === selectedSaleItem?.productName,
+          'bg-gray-200 text-gray-800 hover:bg-gray-300': !item.isSelected && item.productName !== selectedSaleItem?.productName,
+          'bg-gray-300 text-gray-900 ring-2 ring-blue-500': !item.isSelected && item.productName === selectedSaleItem?.productName
         }"
-        class="px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+        class="px-3 py-2 rounded-md focus:outline-none transition flex items-center gap-2"
         (click)="selectItem(item)">
-        {{ item.productName }}
+        <input type="checkbox" [checked]="item.isSelected" (click)="toggleItemSelection(item, $event)" class="w-4 h-4 cursor-pointer">
+        <span>{{ item.productName }}</span>
+        <span *ngIf="item.rebateLabel" class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-yellow-300 text-yellow-900 font-bold">%</span>
       </button>
       <button 
         *ngIf="currentIndex + itemsPerPage < saleItemsList.length" 

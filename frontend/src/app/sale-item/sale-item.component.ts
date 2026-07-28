@@ -27,6 +27,15 @@ export class SaleItemComponent {
 
   constructor(private cdr: ChangeDetectorRef) {}
 
+  get discountedUnitPrice(): string {
+    const qty = parseFloat(this.saleItem.quantity) || 0;
+    const amount = parseFloat(this.saleItem.itemAmount) || 0;
+    if (qty > 0) {
+      return (amount / qty).toFixed(3);
+    }
+    return '';
+  }
+
   onFieldChange(field: string, value: any) {
     let validatedValue = value !== null && value !== undefined ? value.toString() : '';
 

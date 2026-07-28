@@ -420,6 +420,21 @@ const setupRoutes = (app) => {
       );
       if (result.rows.length > 0) {
         const responseData = result.rows[0];
+        let saleItem = [];
+        if (responseData.request_type === 'LoyaltyAward') {
+          const saleItemsResult = await pool.query(`
+            SELECT si.* 
+            FROM sale_items si
+            JOIN basket_data ad ON si.basket_data_id = ad.id
+            WHERE ad.request_info_id = $1
+          `, [responseData.id]);
+          saleItem = saleItemsResult.rows.map(item => ({
+            productCode: item.product_code,
+            amount: parseFloat(item.amount),
+            rebateLabel: item.rebate_label
+          }));
+        }
+
         res.status(200).json({
           cardServiceResponse: {
             attributes: {
@@ -438,6 +453,7 @@ const setupRoutes = (app) => {
                 value: responseData.amount || '',
               },
             },
+            saleItem: saleItem
           },
         });
       } else {
@@ -458,6 +474,21 @@ const setupRoutes = (app) => {
         );
         if (result.rows.length > 0) {
           const responseData = result.rows[0];
+          let saleItem = [];
+          if (responseData.request_type === 'LoyaltyAward') {
+            const saleItemsResult = await pool.query(`
+              SELECT si.* 
+              FROM sale_items si
+              JOIN basket_data ad ON si.basket_data_id = ad.id
+              WHERE ad.request_info_id = $1
+            `, [responseData.id]);
+            saleItem = saleItemsResult.rows.map(item => ({
+              productCode: item.product_code,
+              amount: parseFloat(item.amount),
+              rebateLabel: item.rebate_label
+            }));
+          }
+
           res.status(200).json({
             cardServiceResponse: {
               attributes: {
@@ -476,6 +507,7 @@ const setupRoutes = (app) => {
                   value: responseData.amount || '',
                 },
               },
+              saleItem: saleItem
             },
           });
         } else {
@@ -893,7 +925,7 @@ const setupRoutes = (app) => {
       }
 
       const query = `
-        SELECT 
+        SELECT DISTINCT ON (req.request_timestamp, req.id)
           req.id, 
           req.request_type, 
           COALESCE(res.stan, req.stan) AS stan, 
@@ -910,7 +942,7 @@ const setupRoutes = (app) => {
         LEFT JOIN response_info res ON res.id = req.id
         LEFT JOIN pos_data pos ON pos.request_info_id = req.id
         ${whereClause}
-        ORDER BY req.request_timestamp DESC
+        ORDER BY req.request_timestamp DESC, req.id DESC, b.id DESC
         ${limitClause}
       `;
       const result = await pool.query(query, params);
@@ -934,7 +966,7 @@ const setupRoutes = (app) => {
       const reqQuery = `SELECT * FROM request_info WHERE id = $1`;
       const resQuery = `SELECT * FROM response_info WHERE id = $1`;
       const posQuery = `SELECT * FROM pos_data WHERE request_info_id = $1`;
-      const basketQuery = `SELECT * FROM basket_data WHERE request_info_id = $1`;
+      const basketQuery = `SELECT * FROM basket_data WHERE request_info_id = $1 ORDER BY id DESC LIMIT 1`;
       const loyaltyQuery = `SELECT * FROM loyalty WHERE request_info_id = $1`;
 
       const [reqResult, resResult, posResult, basketResult, loyaltyResult] = await Promise.all([
@@ -953,7 +985,7 @@ const setupRoutes = (app) => {
       if (basketResult.rows.length > 0) {
         const basketId = basketResult.rows[0].id;
         const itemsQuery = `
-          SELECT si.*, p.name as product_name 
+          SELECT si.*, p.name as product_name, p.unit_price as base_unit_price
           FROM sale_items si
           LEFT JOIN products p ON si.product_code = p.product_code
           WHERE si.basket_data_id = $1
@@ -985,6 +1017,7 @@ const setupRoutes = (app) => {
       const cards = result.rows.map(card => ({
         id: card.id,
         name: card.name,
+        card_type: card.card_type,
         number: card.number,
         expiry: card.expiry,
         passcode: card.passcode,
@@ -1048,9 +1081,9 @@ const setupRoutes = (app) => {
       const { requestId } = req.body || {};
       if (requestId) {
         const query = `
-          INSERT INTO response_info (id, overall_result, response_timestamp)
+          INSERT INTO response_info (id, overall_result, created_at)
           VALUES ($1, $2, $3)
-          ON CONFLICT (id) DO UPDATE SET overall_result = EXCLUDED.overall_result, response_timestamp = EXCLUDED.response_timestamp
+          ON CONFLICT (id) DO UPDATE SET overall_result = EXCLUDED.overall_result, created_at = EXCLUDED.created_at
         `;
         await pool.query(query, [requestId, 'Aborted', new Date().toISOString()]);
       }

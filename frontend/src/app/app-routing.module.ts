@@ -15,6 +15,7 @@ const routes: Routes = [
       { path: 'pos-data', component: PosDataComponent },
       { path: 'basket', component: BasketComponent },
       { path: 'loyalty', component: LoyaltyComponent },
+      { path: '', redirectTo: 'pos-data', pathMatch: 'full' },
     ] 
   },
   { path: 'response-info', component: ResponseInfoComponent },

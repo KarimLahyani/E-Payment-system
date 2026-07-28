@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS response_info (
 CREATE TABLE IF NOT EXISTS cards (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255),
+    card_type VARCHAR(255),
     number VARCHAR(255),
     expiry VARCHAR(50),
     passcode VARCHAR(50),
@@ -125,18 +126,18 @@ CREATE TABLE IF NOT EXISTS cards (
 );
 
 -- Seed default cards
-INSERT INTO cards (name, number, expiry, passcode, balance, status)
-SELECT 'Karim Lahyani', '4532111122229012', '2030-12', '4321', 350.00, 'ACTIVE'
+INSERT INTO cards (name, card_type, number, expiry, passcode, balance, status)
+SELECT 'Karim Lahyani', 'Premium Loyalty', '4532111122229012', '2030-12', '4321', 350.00, 'ACTIVE'
 WHERE NOT EXISTS (SELECT 1 FROM cards WHERE number = '4532111122229012');
 
-INSERT INTO cards (name, number, expiry, passcode, balance, status)
-SELECT 'John Doe', '4532333344441044', '2029-05', '2468', 180.00, 'ACTIVE'
+INSERT INTO cards (name, card_type, number, expiry, passcode, balance, status)
+SELECT 'John Doe', 'Standard Corporate', '4532333344441044', '2029-05', '2468', 180.00, 'ACTIVE'
 WHERE NOT EXISTS (SELECT 1 FROM cards WHERE number = '4532333344441044');
 
-INSERT INTO cards (name, number, expiry, passcode, balance, status)
-SELECT 'Blocked Contractor', '4532555566665520', '2028-09', '1111', 100.00, 'BLOCKED'
+INSERT INTO cards (name, card_type, number, expiry, passcode, balance, status)
+SELECT 'Blocked Contractor', 'Standard Corporate', '4532555566665520', '2028-09', '1111', 100.00, 'BLOCKED'
 WHERE NOT EXISTS (SELECT 1 FROM cards WHERE number = '4532555566665520');
 
-INSERT INTO cards (name, number, expiry, passcode, balance, status)
-SELECT 'Expired Service Card', '4532777788887780', '2025-01', '9999', 500.00, 'ACTIVE'
+INSERT INTO cards (name, card_type, number, expiry, passcode, balance, status)
+SELECT 'Expired Service Card', 'Standard Corporate', '4532777788887780', '2025-01', '9999', 500.00, 'ACTIVE'
 WHERE NOT EXISTS (SELECT 1 FROM cards WHERE number = '4532777788887780');

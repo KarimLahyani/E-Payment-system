@@ -42,7 +42,31 @@ export class TransactionHistoryComponent implements OnInit {
     this.requestInfoService.getHistory(this.page, this.limit, this.filters).subscribe({
       next: (data) => {
         const rawTransactions = data.transactions || [];
-        const grouped = [];
+        // Pre-process to clean up old DB entries and link CardPayment to preceding LoyaltyAward
+        for (let i = 0; i < rawTransactions.length; i++) {
+          const tx = rawTransactions[i];
+          // Fix old DB entries that have " TND" appended to the amount string
+          if (tx.basket_total && typeof tx.basket_total === 'string') {
+            tx.basket_total = tx.basket_total.replace(/ (TND|EUR|USD|GBP|€|\$|£)/g, '').trim();
+          }
+          if (tx.original_basket_total && typeof tx.original_basket_total === 'string') {
+            tx.original_basket_total = tx.original_basket_total.replace(/ (TND|EUR|USD|GBP|€|\$|£)/g, '').trim();
+          }
+        }
+
+        for (let i = 0; i < rawTransactions.length - 1; i++) {
+          const current = rawTransactions[i];
+          const previous = rawTransactions[i + 1]; // Previous in time (since order is DESC)
+          if (current.request_type === 'CardPayment' && (previous.request_type === 'LoyaltyAward' || previous.request_type === 'LoyaltyAwardRefund')) {
+            const currentAmount = parseFloat(current.basket_total) || 0;
+            const previousAmount = parseFloat(previous.basket_total) || 0;
+            if (currentAmount === previousAmount && current.overall_result === 'Success' && previous.overall_result === 'Success') {
+              current.linkedToId = previous.id;
+            }
+          }
+        }
+
+        const grouped: any[] = [];
         let currentGroup: any = null;
 
         for (const tx of rawTransactions) {
@@ -147,6 +171,7 @@ export class TransactionHistoryComponent implements OnInit {
     this.requestInfoService.getTransactionDetails(targetId).subscribe({
       next: (data) => {
         this.selectedTransaction = data;
+        this.selectedTransaction.linkedToId = tx.linkedToId;
         // Inject the grouped transactions into the selectedTransaction for the modal to display
         if (tx.isGroup) {
           this.selectedTransaction.isGroup = true;
@@ -176,6 +201,28 @@ export class TransactionHistoryComponent implements OnInit {
     if (!items || items.length === 0) return '0.00';
     const total = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
     return total.toFixed(2);
+  }
+
+  hasDiscount(items: any[]): boolean {
+    if (!items || !Array.isArray(items) || items.length === 0) return false;
+    return items.some(item => {
+      const label = item.rebate_label || item.rebateLabel;
+      return label && typeof label === 'string' && label.trim().length > 0 && label !== 'null' && label !== 'undefined';
+    });
+  }
+
+  getOriginalTotal(items: any[]): number {
+    if (!items || items.length === 0) return 0;
+    return items.reduce((sum, item) => {
+      if (item.rebate_label && item.base_unit_price) {
+        return sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.base_unit_price) || 0));
+      }
+      return sum + (parseFloat(item.amount) || 0);
+    }, 0);
+  }
+
+  getOriginalItemAmount(item: any): number {
+    return (parseFloat(item.quantity) || 0) * (parseFloat(item.base_unit_price) || 0);
   }
 
   closeDetails(): void {
