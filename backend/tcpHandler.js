@@ -5,14 +5,6 @@ const { generateLengthHeader } = require('./utils');
 const { pool } = require('./database');
 const xml2js = require('xml2js');
 const iconv = require('iconv-lite');
-// Ajouter le module readline pour lire les entrées du terminal
-const readline = require('readline');
-
-// Créer une interface readline pour lire les entrées utilisateur
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
 
 // Fonction pour obtenir l'adresse IP locale de la carte réseau
 function getLocalIPAddress() {
@@ -145,20 +137,15 @@ const server = net.createServer((socket) => {
             lastCashierTerminalMessage = decodedMessage;
             console.log(`Decoded CashierTerminal message: ${lastCashierTerminalMessage}`);
 
-            // Demander une entrée utilisateur via le terminal
-            console.log('Veuillez entrer YES ou NO dans le terminal (90 secondes avant timeout) :');
+            // Attendre une entrée de l'utilisateur via l'interface Web (90 secondes avant timeout)
+            console.log('Waiting for CashierTerminal YES/NO response from Web UI (90s timeout)...');
 
-            // Promesse pour attendre l'entrée utilisateur
+            // Promesse pour attendre l'entrée via l'API
             const getUserInput = () =>
               new Promise((resolve) => {
-                rl.question('Réponse (YES/NO) : ', (answer) => {
+                setCashierTerminalCallback((answer) => {
                   const confirmation = answer.trim().toUpperCase();
-                  if (['YES', 'NO'].includes(confirmation)) {
-                    resolve(confirmation);
-                  } else {
-                    console.log('Entrée invalide, veuillez entrer YES ou NO.');
-                    resolve(getUserInput()); // Redemander si l'entrée est invalide
-                  }
+                  resolve(confirmation);
                 });
               });
 
@@ -429,6 +416,16 @@ const setCashierTerminalCallback = (callback) => {
   cashierTerminalCallback = callback;
 };
 
+// Fonction pour résoudre la réponse CashierTerminal depuis l'API
+const resolveCashierTerminalResponse = (responseValue) => {
+  if (cashierTerminalCallback) {
+    cashierTerminalCallback(responseValue);
+    resetCashierTerminalCallback();
+    return true;
+  }
+  return false;
+};
+
 // Fonction pour réinitialiser le callback CashierTerminal
 const resetCashierTerminalCallback = () => {
   console.log('Réinitialisation du callback CashierTerminal');
@@ -528,9 +525,24 @@ const restartTcpServer = () => {
 
 const getConfigData = () => configData;
 const getLastResponseXML = () => lastResponseXML;
-const getLastDisplayMessage = () => lastDisplayMessage;
-const getLastPrinterMessage = () => lastPrinterMessage;
-const getLastCashierTerminalMessage = () => lastCashierTerminalMessage;
+
+const getLastDisplayMessage = () => {
+  const msg = lastDisplayMessage;
+  lastDisplayMessage = '';
+  return msg;
+};
+
+const getLastPrinterMessage = () => {
+  const msg = lastPrinterMessage;
+  lastPrinterMessage = '';
+  return msg;
+};
+
+const getLastCashierTerminalMessage = () => {
+  const msg = lastCashierTerminalMessage;
+  lastCashierTerminalMessage = '';
+  return msg;
+};
 
 
 let io;
@@ -618,6 +630,7 @@ module.exports = {
   getLastCashierTerminalMessage,
   configData,
   processCardServiceResponse,
+  resolveCashierTerminalResponse,
   setCashierTerminalCallback,
   resetCashierTerminalCallback,
 };

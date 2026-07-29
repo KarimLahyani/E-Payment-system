@@ -125,16 +125,19 @@
         receiptPromise = fetch('http://localhost:3000/api/history?limit=100')
           .then(r => r.json())
           .then(data => {
-            const targetIndex = data.transactions.findIndex(t => t.stan === stanToReprint || t.id.toString() === stanToReprint);
+            const targetIndex = data.transactions.findIndex(t => 
+              (t.stan === stanToReprint || t.id.toString() === stanToReprint) && 
+              t.requestType !== 'TicketReprint'
+            );
             if (targetIndex === -1) return "TRANSACTION NOT FOUND IN DATABASE";
             const targetTx = data.transactions[targetIndex];
 
-            if (targetTx.is_split) {
-              // Find contiguous split transactions for this group
+            if (targetTx.isSplit && targetTx.splitId) {
+              // Find contiguous split transactions for this group based on splitId
               let startIndex = targetIndex;
-              while (startIndex < data.transactions.length - 1 && data.transactions[startIndex + 1].is_split) startIndex++;
+              while (startIndex < data.transactions.length - 1 && data.transactions[startIndex + 1].splitId === targetTx.splitId) startIndex++;
               let endIndex = targetIndex;
-              while (endIndex > 0 && data.transactions[endIndex - 1].is_split) endIndex--;
+              while (endIndex > 0 && data.transactions[endIndex - 1].splitId === targetTx.splitId) endIndex--;
               
               const splitGroup = data.transactions.slice(endIndex, startIndex + 1).reverse();
               
@@ -142,24 +145,24 @@
                 .then(fullTxs => {
                   const firstTx = fullTxs[0];
                   const decision = { 
-                    approved: targetTx.overall_result === 'Success', 
-                    authCode: targetTx.auth_code || 'N/A',
-                    reason: targetTx.overall_result === 'Success' ? 'Approved' : 'Declined'
+                    approved: targetTx.overallResult === 'Success', 
+                    authCode: 'N/A',
+                    reason: targetTx.overallResult === 'Success' ? 'Approved' : 'Declined'
                   };
                   const card = { 
-                    name: targetTx.customer_name || 'UNKNOWN', 
-                    number: targetTx.card_number || '**** 0000' 
+                    name: targetTx.customerName || 'UNKNOWN', 
+                    number: targetTx.cardNumber || '**** 0000' 
                   };
                   
                   let items = [];
                   try {
-                    if (typeof firstTx.basket_data?.sale_items === 'string') {
-                       items = JSON.parse(firstTx.basket_data.sale_items);
-                    } else if (firstTx.sale_items && Array.isArray(firstTx.sale_items)) {
-                       items = firstTx.sale_items.map(i => {
+                    if (typeof firstTx.basketData?.saleItems === 'string') {
+                       items = JSON.parse(firstTx.basketData.saleItems);
+                    } else if (firstTx.saleItems && Array.isArray(firstTx.saleItems)) {
+                       items = firstTx.saleItems.map(i => {
                          let info = { unitPrice: 0, unitMeasure: '', taxCode: 'A' };
-                         if (typeof i.add_prod_info === 'string') {
-                           const parts = i.add_prod_info.split(';');
+                         if (typeof i.addProdInfo === 'string') {
+                           const parts = i.addProdInfo.split(';');
                            if (parts.length > 1 && parts[1].includes('=')) {
                              const unitParts = parts[1].split('=')[1].split('/');
                              info.unitPrice = parseFloat(unitParts[0]) || 0;
@@ -170,7 +173,7 @@
                            }
                          }
                          return {
-                           productName: i.product_name || i.product_code,
+                           productName: i.productName || i.productCode,
                            amount: parseFloat(i.amount),
                            quantity: parseFloat(i.quantity),
                            unitPrice: info.unitPrice,
@@ -182,9 +185,9 @@
                   } catch(e) {}
                   
                   const transaction = {
-                    amount: parseFloat(firstTx.basket_data?.total_amount || 0),
-                    currency: firstTx.basket_data?.currency || 'TND',
-                    requestType: firstTx.request_info?.request_type || 'Unknown',
+                    amount: parseFloat(firstTx.basketData?.totalAmount || 0),
+                    currency: firstTx.basketData?.currency || 'TND',
+                    requestType: firstTx.requestInfo?.requestType || 'Unknown',
                     stan: stanToReprint,
                     items: items,
                     siteId: 'SITE-0142',
@@ -194,11 +197,11 @@
                   const splitSession = { payments: [] };
                   fullTxs.forEach(ftx => {
                     splitSession.payments.push({
-                      amount: parseFloat(ftx.request_info?.amount || ftx.basket_data?.total_amount || 0),
-                      cardNumber: ftx.response_info?.card_number || '**** 0000',
-                      cardName: ftx.response_info?.customer_name || 'UNKNOWN',
-                      authCode: ftx.response_info?.auth_code || 'N/A',
-                      reason: ftx.response_info?.overall_result === 'Success' ? 'Approved' : 'Declined'
+                      amount: parseFloat(ftx.requestInfo?.amount || ftx.basketData?.totalAmount || 0),
+                      cardNumber: ftx.responseInfo?.cardNumber || '**** 0000',
+                      cardName: ftx.responseInfo?.customerName || 'UNKNOWN',
+                      authCode: ftx.responseInfo?.authCode || 'N/A',
+                      reason: ftx.responseInfo?.overallResult === 'Success' ? 'Approved' : 'Declined'
                     });
                   });
 
@@ -209,24 +212,24 @@
                 .then(r => r.json())
                 .then(fullTx => {
                   const decision = { 
-                    approved: fullTx.response_info?.overall_result === 'Success', 
-                    authCode: fullTx.response_info?.auth_code || 'N/A',
-                    reason: fullTx.response_info?.overall_result === 'Success' ? 'Approved' : 'Declined'
+                    approved: fullTx.responseInfo?.overallResult === 'Success', 
+                    authCode: fullTx.responseInfo?.authCode || 'N/A',
+                    reason: fullTx.responseInfo?.overallResult === 'Success' ? 'Approved' : 'Declined'
                   };
                   const card = { 
-                    name: fullTx.response_info?.customer_name || 'UNKNOWN', 
-                    number: fullTx.response_info?.card_number || '**** 0000' 
+                    name: fullTx.responseInfo?.customerName || 'UNKNOWN', 
+                    number: fullTx.responseInfo?.cardNumber || '**** 0000' 
                   };
                   
                   let items = [];
                   try {
-                    if (typeof fullTx.basket_data?.sale_items === 'string') {
-                       items = JSON.parse(fullTx.basket_data.sale_items);
-                    } else if (fullTx.sale_items && Array.isArray(fullTx.sale_items)) {
-                       items = fullTx.sale_items.map(i => {
+                    if (typeof fullTx.basketData?.saleItems === 'string') {
+                       items = JSON.parse(fullTx.basketData.saleItems);
+                    } else if (fullTx.saleItems && Array.isArray(fullTx.saleItems)) {
+                       items = fullTx.saleItems.map(i => {
                          let info = { unitPrice: 0, unitMeasure: '', taxCode: 'A' };
-                         if (typeof i.add_prod_info === 'string') {
-                           const parts = i.add_prod_info.split(';');
+                         if (typeof i.addProdInfo === 'string') {
+                           const parts = i.addProdInfo.split(';');
                            if (parts.length > 1 && parts[1].includes('=')) {
                              const unitParts = parts[1].split('=')[1].split('/');
                              info.unitPrice = parseFloat(unitParts[0]) || 0;
@@ -237,7 +240,7 @@
                            }
                          }
                          return {
-                           productName: i.product_name || i.product_code,
+                           productName: i.productName || i.productCode,
                            amount: parseFloat(i.amount),
                            quantity: parseFloat(i.quantity),
                            unitPrice: info.unitPrice,
@@ -249,9 +252,9 @@
                   } catch(e) {}
                   
                   const transaction = {
-                    amount: parseFloat(fullTx.basket_data?.total_amount || 0),
-                    currency: fullTx.basket_data?.currency || 'TND',
-                    requestType: fullTx.request_info?.request_type || 'Unknown',
+                    amount: parseFloat(fullTx.basketData?.totalAmount || 0),
+                    currency: fullTx.basketData?.currency || 'TND',
+                    requestType: fullTx.requestInfo?.requestType || 'Unknown',
                     stan: stanToReprint,
                     items: items,
                     siteId: 'SITE-0142'
@@ -409,7 +412,7 @@
       button.className = `business-card${card.id === state.selectedCardId ? " selected" : ""}`;
       button.innerHTML = `
         <strong>${escapeHtml(card.name)}</strong>
-        <span>**** ${escapeHtml(card.number.slice(-4))} - ID ${escapeHtml(card.id)}</span>
+        <span>${escapeHtml(card.number)} - ID ${escapeHtml(card.id)}</span>
         <span>Expires ${escapeHtml(card.expiry)} - Credit ${formatMoney(card.balance, el.currencyInput.value)}</span>
         <span class="card-meta">
           <span>${escapeHtml(card.status)}</span>
@@ -418,7 +421,7 @@
       `;
       button.addEventListener("click", () => {
         state.selectedCardId = card.id;
-        render();
+        renderCards();
       });
       el.cardList.appendChild(button);
     });
@@ -819,21 +822,21 @@
             };
           }
           
-          const cardKey = `**** ${card.number.slice(-4)}`;
           state.splitSession.payments.push({
             cardName: card.name.toUpperCase(),
-            cardNumber: cardKey,
+            cardNumber: card.number,
             amount: state.transaction.amount,
             approved: decision.approved,
             authCode: decision.authCode || 'N/A',
-            reason: decision.reason
+            reason: decision.reason,
+            isManual: state.transaction.isManual
           });
           
           if (decision.approved) {
             state.splitSession.paidAmount += state.transaction.amount;
           }
           
-          if (state.splitSession.paidAmount < state.splitSession.basketTotal) {
+          if ((state.splitSession.basketTotal - state.splitSession.paidAmount) > 0.001) {
             shouldPrintReceipt = false;
             setScreen([decision.approved ? "APPROVED" : "DECLINED", "WAITING FOR NEXT PAYMENT..."]);
             state.terminalMode = "waitingForCard";
@@ -1121,8 +1124,6 @@ ${indent}</${name}>`;
     lines.push(lblSubtotal + " ".repeat(40 - lblSubtotal.length - subtotalStr.length) + subtotalStr);
     lines.push(lblTax + " ".repeat(40 - lblTax.length - taxStr.length) + taxStr);
     lines.push(lblTotal + " ".repeat(40 - lblTotal.length - amountStrFormatted.length) + amountStrFormatted);
-    
-      lines.push(lblTotal + " ".repeat(40 - lblTotal.length - amountStrFormatted.length) + amountStrFormatted);
       
       if (transaction.split && sessionToUse && sessionToUse.payments) {
         sessionToUse.payments.forEach(payment => {
@@ -1134,13 +1135,14 @@ ${indent}</${name}>`;
           lines.push(lblName + " ".repeat(40 - lblName.length - payment.cardName.length) + payment.cardName.toUpperCase());
           const authCode = payment.authCode || 'N/A';
           lines.push(lblAuth + " ".repeat(40 - lblAuth.length - authCode.length) + authCode);
-          lines.push(lblEntry + " ".repeat(40 - lblEntry.length - entryVal.length) + entryVal);
+          const paymentEntryVal = payment.isManual ? (isFr ? "MANUELLE" : "TYPED") : (isFr ? "PHYSIQUE" : "PHYSICAL");
+          lines.push(lblEntry + " ".repeat(40 - lblEntry.length - paymentEntryVal.length) + paymentEntryVal);
           const reason = (payment.reason || '').toUpperCase();
           lines.push(lblStatus + " ".repeat(40 - lblStatus.length - reason.length) + reason);
         });
       } else {
         lines.push(divider);
-        lines.push(lblCard + " ".repeat(40 - lblCard.length - 9) + `**** ${card.number.slice(-4)}`);
+        lines.push(lblCard + " ".repeat(40 - lblCard.length - card.number.length) + card.number);
         lines.push(lblName + " ".repeat(40 - lblName.length - card.name.length) + card.name.toUpperCase());
         const authCode = decision.authCode || 'N/A';
         lines.push(lblAuth + " ".repeat(40 - lblAuth.length - authCode.length) + authCode);

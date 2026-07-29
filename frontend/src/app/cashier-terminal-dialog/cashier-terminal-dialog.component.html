@@ -1,4 +1,4 @@
-﻿<div class="terminal-dialog">
+<div class="terminal-dialog">
   <section class="terminal-shell">
     <div class="terminal-top">
       <div>
@@ -13,7 +13,7 @@
       <div class="screen-sub" *ngFor="let line of lines.slice(1)">{{ line }}</div>
     </div>
 
-    <div class="card-area">
+    <div class="card-area" *ngIf="mode !== 'generic'">
       <div class="business-card" [class.inserted]="cardInserted">
         <div class="chip"></div>
         <div>

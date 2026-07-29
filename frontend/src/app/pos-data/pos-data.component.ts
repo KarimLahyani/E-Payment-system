@@ -36,7 +36,13 @@ export class PosDataComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
-    this.loadLastPosData();
+    const currentData = (this.requestInfoService as any).currentData;
+    if (!(this.requestInfoService as any).posDataLoaded) {
+      this.loadLastPosData();
+      (this.requestInfoService as any).posDataLoaded = true;
+    } else if (currentData && currentData.posData) {
+      this.posData = JSON.parse(JSON.stringify(currentData.posData));
+    }
     this.subscribeToRequestType();
     this.subscribeToDataChanges();
   }

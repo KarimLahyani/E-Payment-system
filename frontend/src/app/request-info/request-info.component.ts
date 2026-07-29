@@ -130,6 +130,9 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
   responseRequestId: string | null = null;
   currentRequestId: string = '1';
   private lastShownDialogMessage: string = '';
+  private lastShownPrinterMessage: string = '';
+  private lastShownCashierTerminalMessage: string = '';
+  currentSplitSessionId: string | null = null;
 
   configData: ConfigurationData = {
     clientIp: '127.0.0.1',
@@ -179,7 +182,10 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
           this.deviceData.display = messages.display;
         }
         if (messages.printer && messages.printer !== 'No message content') {
-          this.deviceData.printer = messages.printer;
+          if (messages.printer !== this.lastShownPrinterMessage) {
+            this.lastShownPrinterMessage = messages.printer;
+            this.showReceiptConfirmationDialog(messages.printer);
+          }
         }
         if (messages.cashierTerminal && messages.cashierTerminal !== 'No message content') {
           console.log('Message CashierTerminal détecté:', messages.cashierTerminal);
@@ -203,7 +209,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
       console.log('Ouverture de la pop-up avec message:', message);
       // Ouvrir la pop-up CashierTerminalDialogComponent
       const dialogRef = this.dialog.open(CashierTerminalDialogComponent, {
-        width: '400px',
+        width: '460px',
         data: { message }
       });
 
@@ -215,6 +221,33 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
           () => console.log(`Confirmation ${confirmation} envoyée avec succès`),
           error => console.error(`Erreur lors de l'envoi de la confirmation ${confirmation}:`, error)
         );
+      });
+    }
+  }
+
+  private showReceiptConfirmationDialog(receiptContent: string) {
+    if (receiptContent) {
+      console.log('Ouverture de la pop-up pour le ticket');
+
+      if (this.requestData.requestType === 'TicketReprint') {
+        this.deviceData.printer = receiptContent;
+        this.cdr.detectChanges();
+        return;
+      }
+
+      const dialogRef = this.dialog.open(CashierTerminalDialogComponent, {
+        width: '460px',
+        data: { message: 'Does the customer want a receipt?' }
+      });
+
+      dialogRef.afterClosed().subscribe(result => {
+        if (result === 'YES') {
+          this.deviceData.printer = receiptContent;
+          this.cdr.detectChanges();
+        } else {
+          this.deviceData.printer = '🌿 Receipt discarded to save paper!';
+          this.cdr.detectChanges();
+        }
       });
     }
   }
@@ -407,13 +440,31 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     const requestBasketData = JSON.parse(JSON.stringify(this.basketData));
     // Keep a reference to the real total for split receipts logic
     requestBasketData.originalTotalAmount = this.basketData.totalAmount;
+    
+    const requestPosData = JSON.parse(JSON.stringify(this.posData));
+
     if (amountToSend) {
       requestBasketData.totalAmount = amountToSend;
+      if (requestPosData.split) {
+        // If the user selected Split, but paid the entire basket total in one go (on the first payment), treat as non-split
+        if (this.paidAmount === 0 && parseFloat(amountToSend) >= parseFloat(this.basketData.totalAmount)) {
+          requestPosData.split = false;
+          requestPosData.splitId = null;
+        } else {
+          // It's a genuine partial split payment or the final payment of a split sequence
+          if (!this.currentSplitSessionId) {
+            this.currentSplitSessionId = 'split_' + new Date().getTime();
+          }
+          requestPosData.splitId = this.currentSplitSessionId;
+        }
+      }
+    } else {
+      requestPosData.splitId = null;
     }
 
     const fullRequestData: FullRequestData = {
       requestData: this.requestData,
-      posData: this.posData,
+      posData: requestPosData,
       basketData: requestBasketData,
       loyaltyData: this.loyaltyData,
       configData: this.configData
@@ -488,6 +539,8 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
   }
 
   abortTransaction() {
+    this.currentSplitSessionId = null;
+    this.paidAmount = 0;
     this.requestInfoService.abortTransaction(this.activeResponseRequestId || undefined).subscribe({
       next: () => {
         console.log("Transaction aborted successfully");
@@ -506,6 +559,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     this.resetToInitialState();
     this.serviceRequestMessage = '';
     this.lastShownDialogMessage = '';
+    this.lastShownPrinterMessage = '';
     console.log("Clear button clicked, all fields cleared");
     this.requestInfoService.resetTerminalSimulator().subscribe();
   }
@@ -777,11 +831,14 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
         
         if (this.posData.split && amountToSend) {
           this.paidAmount += parseFloat(amountToSend);
-          if (this.remainingBalance <= 0) {
+          if (this.remainingBalance <= 0.001) {
             this.posData.split = false;
             this.paidAmount = 0;
+            this.currentSplitSessionId = null;
             this.requestInfoService.updateData({ posData: this.posData });
           }
+        } else {
+          this.currentSplitSessionId = null;
         }
       }
 

@@ -15,6 +15,7 @@ export class TransactionHistoryComponent implements OnInit {
   page: number = 1;
   limit: any = 10;
   totalCount: number = 0;
+  totalRevenue: number = 0;
   filters: any = {
     startDate: '',
     endDate: '',
@@ -54,32 +55,31 @@ export class TransactionHistoryComponent implements OnInit {
           }
         }
 
-        for (let i = 0; i < rawTransactions.length - 1; i++) {
-          const current = rawTransactions[i];
-          const previous = rawTransactions[i + 1]; // Previous in time (since order is DESC)
-          if (current.requestType === 'CardPayment' && (previous.requestType === 'LoyaltyAward' || previous.requestType === 'LoyaltyAwardRefund')) {
-            const currentAmount = parseFloat(current.basketTotal) || 0;
-            const previousAmount = parseFloat(previous.basketTotal) || 0;
-            if (currentAmount === previousAmount && current.overallResult === 'Success' && previous.overallResult === 'Success') {
-              current.linkedToId = previous.id;
-            }
-          }
-        }
-
         const grouped: any[] = [];
         let currentGroup: any = null;
 
         for (const tx of rawTransactions) {
-          if (tx.isSplit) {
-            if (!currentGroup) {
+          // Clear basket total for requests that do not actually represent a financial transaction
+          if (tx.requestType === 'TicketReprint' || tx.requestType === 'Login' || tx.requestType === 'Logoff') {
+            tx.basketTotal = '0.00';
+          }
+
+          if (tx.isSplit && tx.splitId) {
+            if (!currentGroup || currentGroup.splitId !== tx.splitId) {
+              if (currentGroup) {
+                currentGroup.basketTotal = currentGroup.basketTotal.toFixed(2);
+                grouped.push(currentGroup);
+              }
               currentGroup = {
                 isGroup: true,
                 id: tx.id.toString(),
+                splitId: tx.splitId,
                 requestTimestamp: tx.requestTimestamp,
                 requestType: tx.requestType,
                 basketTotal: tx.overallResult === 'Success' ? parseFloat(tx.basketTotal || '0') : 0,
                 currency: tx.currency,
                 stan: tx.stan ? tx.stan.toString() : '',
+                linkedToId: tx.linkedToId,
                 overallResult: tx.overallResult,
                 customerName: tx.customerName,
                 cardNumber: tx.cardNumber,
@@ -94,14 +94,23 @@ export class TransactionHistoryComponent implements OnInit {
               if (tx.overallResult === 'Success') {
                 currentGroup.basketTotal += parseFloat(tx.basketTotal || '0');
               }
-              currentGroup.stan += tx.stan ? (', ' + tx.stan) : '';
+              // Set the group's STAN to the first successful transaction's STAN if not already set, or just keep the first one
+              // We do not append multiple STANs to avoid ruining the table layout
+              if (!currentGroup.stan && tx.stan) {
+                currentGroup.stan = tx.stan;
+              }
+              if (tx.linkedToId && !currentGroup.linkedToId) {
+                currentGroup.linkedToId = tx.linkedToId;
+              }
               currentGroup.transactions.push(tx);
 
-              // Determine overall result logic for groups (e.g. if any failed, mark partial or failed)
-              if (tx.overallResult === 'Failed' && currentGroup.overallResult === 'Success') {
-                currentGroup.overallResult = 'Partial';
-              } else if (tx.overallResult === 'Success' && currentGroup.overallResult === 'Failed') {
-                currentGroup.overallResult = 'Partial';
+              // Determine overall result logic for groups
+              // If any transaction in the group was successful, the group as a whole is considered a Success
+              // (because its basketTotal reflects the sum of successful payments)
+              if (tx.overallResult === 'Success') {
+                currentGroup.overallResult = 'Success';
+              } else if (!currentGroup.overallResult || (currentGroup.overallResult !== 'Success' && (tx.overallResult === 'Failed' || tx.overallResult === 'Failure'))) {
+                currentGroup.overallResult = 'Failed';
               }
             }
           } else {
@@ -109,6 +118,11 @@ export class TransactionHistoryComponent implements OnInit {
               currentGroup.basketTotal = currentGroup.basketTotal.toFixed(2);
               grouped.push(currentGroup);
               currentGroup = null;
+            }
+            if (tx.basketTotal && typeof tx.basketTotal === 'number') {
+              tx.basketTotal = tx.basketTotal.toFixed(2);
+            } else if (tx.basketTotal && typeof tx.basketTotal === 'string') {
+              tx.basketTotal = parseFloat(tx.basketTotal).toFixed(2);
             }
             grouped.push(tx);
           }
@@ -118,8 +132,29 @@ export class TransactionHistoryComponent implements OnInit {
           grouped.push(currentGroup);
         }
 
+        for (let i = 0; i < grouped.length; i++) {
+          const current = grouped[i];
+          if (current.requestType === 'CardPayment' && (current.overallResult === 'Success' || current.overallResult === 'Partial')) {
+            for (let j = i + 1; j < grouped.length; j++) {
+              const previous = grouped[j];
+              if (previous.requestType === 'LoyaltyAward' || previous.requestType === 'LoyaltyAwardRefund') {
+                const currentAmount = parseFloat(current.basketTotal) || 0;
+                const previousAmount = parseFloat(previous.basketTotal) || 0;
+                if (Math.abs(currentAmount - previousAmount) < 0.001 && previous.overallResult === 'Success') {
+                  current.linkedToId = previous.id;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
         this.transactions = grouped;
         this.totalCount = data.totalCount || 0;
+        
+        // Use total revenue calculated by backend
+        this.totalRevenue = data.totalRevenue || 0;
+
         this.isLoading = false;
       },
       error: (err) => {
@@ -195,6 +230,11 @@ export class TransactionHistoryComponent implements OnInit {
         this.isLoadingDetails = false;
       }
     });
+  }
+
+  openLinkedTransaction(linkedToId: string, event: Event): void {
+    event.stopPropagation(); // Prevent the row click event from firing
+    this.openDetails({ id: linkedToId });
   }
 
   getBasketItemsTotal(items: any[]): string {

@@ -49,7 +49,10 @@ export class BasketComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const currentData = (this.requestInfoService as any).currentData;
-    if (currentData && currentData.basketData) {
+    if (!(this.requestInfoService as any).basketDataLoaded) {
+      this.loadLastBasketData();
+      (this.requestInfoService as any).basketDataLoaded = true;
+    } else if (currentData && currentData.basketData) {
       this.basketData = JSON.parse(JSON.stringify(currentData.basketData));
     }
     

@@ -1,7 +1,7 @@
 const { pool } = require('./database');
 const { insertWithErrorHandling, prepareSaleItemValues, transformSaleItem, generateDefaultSaleItems } = require('./utils');
 const { generateServiceRequest, updateConfigData: updateXmlConfigData } = require('./xmlGenerator');
-const { addMessageToSend, updateConfigData: updateTcpConfigData, restartTcpServer, getConfigData, getLastResponseXML, getLastDisplayMessage, getLastPinPadMessage, getLastPrinterMessage, processCardServiceResponse, resolveCashierTerminalResponse, getLastCashierTerminalMessage, clearDeviceMessages } = require('./tcpHandler');
+const { addMessageToSend, updateConfigData: updateTcpConfigData, restartTcpServer, getConfigData, getLastResponseXML, getLastDisplayMessage, getLastPrinterMessage, processCardServiceResponse, resolveCashierTerminalResponse, getLastCashierTerminalMessage, clearDeviceMessages } = require('./tcpHandler');
 
 // Variable globale pour stocker le dernier message XML généré
 let lastServiceRequest = '';
@@ -275,12 +275,13 @@ const setupRoutes = (app) => {
           posData.shiftNumber || null,
           posData.clerkId || null,
           posData.posName || null,
+          posData.splitId || null,
           posData.split || false,
           posData.unattended || false,
           requestId,
         ];
         await insertWithErrorHandling(
-          'INSERT INTO pos_data (pos_timestamp, language_code, card_entry_mode, shift_number, clerk_id, pos_name, split, unattended, request_info_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+          'INSERT INTO pos_data (pos_timestamp, language_code, card_entry_mode, shift_number, clerk_id, pos_name, split_id, split, unattended, request_info_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
           posValues,
           'Pos data inserted successfully:'
         );
@@ -513,6 +514,7 @@ const setupRoutes = (app) => {
           outdoorPosition: posData.outdoor_position || '',
           clerkId: posData.clerk_id || '',
           posName: posData.pos_name || '',
+          splitId: posData.split_id || '',
           split: posData.split || false,
           unattended: posData.unattended || false,
           requestInfoId: posData.request_info_id || null,
@@ -857,6 +859,25 @@ const setupRoutes = (app) => {
       const countResult = await pool.query(countQuery, params);
       const totalCount = parseInt(countResult.rows[0].count, 10);
 
+      // Revenue calculation
+      const revenueQuery = `
+        SELECT DISTINCT ON (req.request_timestamp, req.id)
+          b.total_amount
+        FROM request_info req
+        LEFT JOIN basket_data b ON b.request_info_id = req.id
+        LEFT JOIN response_info res ON res.id = req.id
+        ${whereClause ? whereClause + " AND " : "WHERE "}
+        req.request_type = 'CardPayment' AND res.overall_result = 'Success'
+      `;
+      const revenueResult = await pool.query(revenueQuery, params);
+      let totalRevenue = 0;
+      revenueResult.rows.forEach(row => {
+        if (row.total_amount) {
+          const val = parseFloat(row.total_amount.replace(/[^\d.-]/g, '')) || 0;
+          totalRevenue += val;
+        }
+      });
+
       // Data query
       let limitClause = '';
       if (limit !== 'all') {
@@ -876,6 +897,7 @@ const setupRoutes = (app) => {
           b.currency,
           res.overall_result,
           res.error_condition,
+          pos.split_id,
           pos.split AS is_split,
           res.card_number,
           res.customer_name
@@ -891,6 +913,7 @@ const setupRoutes = (app) => {
       
       res.status(200).json({
         totalCount,
+        totalRevenue,
         transactions: result.rows.map(tx => ({
           id: tx.id,
           requestType: tx.request_type,
@@ -900,6 +923,7 @@ const setupRoutes = (app) => {
           currency: tx.currency,
           overallResult: tx.overall_result,
           errorCondition: tx.error_condition,
+          splitId: tx.split_id,
           isSplit: tx.is_split,
           cardNumber: tx.card_number,
           customerName: tx.customer_name
