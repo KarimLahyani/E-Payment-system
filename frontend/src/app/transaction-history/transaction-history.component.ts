@@ -273,4 +273,13 @@ export class TransactionHistoryComponent implements OnInit {
   goBack(): void {
     this.router.navigate(['/request-info']);
   }
+
+  formatCardNumber(cardNumber: string | undefined): string {
+    if (!cardNumber || cardNumber === 'Multiple Cards') return cardNumber || '';
+    const clean = cardNumber.replace(/\*/g, '');
+    if (clean.length >= 4) {
+      return `**** ${clean.slice(-4)}`;
+    }
+    return `**** ${clean}`;
+  }
 }

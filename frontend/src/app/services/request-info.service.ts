@@ -253,22 +253,6 @@ export class RequestInfoService {
           isSelected: item.isSelected !== undefined ? item.isSelected : false,
           createdAt: item.createdAt || '',
         })),
-        itemDetails: {
-          productName: '',
-          productCode: '',
-          amount: '',
-          quantity: '',
-          taxCode: '',
-          addProdCode: '',
-          reverseSale: '',
-          unitPrice: '',
-          unitMeasure: '',
-          saleChannel: '',
-          rebateLabel: '',
-          addProdInfo: '',
-          isSelected: false,
-          createdAt: '',
-        },
         discount: '0.00'
       },
       loyaltyData: data.loyaltyData || this.currentData?.loyaltyData || {

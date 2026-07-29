@@ -50,7 +50,6 @@ export interface BasketData {
   preAuthAmount: string;
   currency: string;
   saleItems: SaleItem[];
-  itemDetails: SaleItem;
   discount?: string; // Champ ajouté pour stocker la remise
 }
 

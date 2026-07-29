@@ -20,22 +20,6 @@ export class BasketComponent implements OnInit, OnDestroy {
     preAuthAmount: '',
     currency: 'TND',
     saleItems: [],
-    itemDetails: {
-      productName: '',
-      productCode: '',
-      amount: '',
-      quantity: '',
-      taxCode: '',
-      addProdCode: '',
-      reverseSale: '',
-      unitPrice: '',
-      unitMeasure: '',
-      saleChannel: '',
-      rebateLabel: '',
-      addProdInfo: '',
-      isSelected: false,
-      createdAt: ''
-    },
     discount: '0.00'
   };
 

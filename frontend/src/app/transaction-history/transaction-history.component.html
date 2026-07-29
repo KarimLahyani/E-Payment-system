@@ -141,9 +141,9 @@
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               <div *ngIf="tx.customerName || tx.cardNumber">
-                <span class="font-medium">{{ tx.customerName || 'Customer' }}</span>
-                <span class="text-gray-500 ml-1 text-xs" *ngIf="tx.cardNumber">({{ tx.cardNumber }})</span>
-              </div>
+                  <span class="font-medium">{{ tx.customerName || 'Customer' }}</span>
+                  <span class="text-gray-500 ml-1 text-xs" *ngIf="tx.cardNumber">({{ formatCardNumber(tx.cardNumber) }})</span>
+                </div>
               <span *ngIf="!tx.customerName && !tx.cardNumber" class="text-gray-400">-</span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm">
@@ -348,7 +348,7 @@
               <div class="font-medium text-gray-900">{{ selectedTransaction.responseInfo.customerName || '-' }}</div>
 
               <div class="text-gray-500">Card Number:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.responseInfo.cardNumber || '-' }}</div>
+              <div class="font-medium text-gray-900">{{ formatCardNumber(selectedTransaction.responseInfo.cardNumber) || '-' }}</div>
             </div>
             <ng-template #noPaymentData>
               <div class="text-sm text-gray-500 italic">No payment card data available.</div>
@@ -466,8 +466,8 @@
                 <td class="px-4 py-2 text-sm text-gray-900">
                   <div *ngIf="splitTx.customerName || splitTx.cardNumber">
                     <span class="font-medium">{{ splitTx.customerName || 'Customer' }}</span>
-                    <span class="text-gray-500 ml-1 text-xs" *ngIf="splitTx.cardNumber">({{ splitTx.cardNumber
-                      }})</span>
+                    <span class="text-gray-500 ml-1 text-xs" *ngIf="splitTx.cardNumber">({{ formatCardNumber(splitTx.cardNumber)
+                        }})</span>
                   </div>
                   <span *ngIf="!splitTx.customerName && !splitTx.cardNumber" class="text-gray-400">-</span>
                 </td>

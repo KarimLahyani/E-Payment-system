@@ -56,21 +56,6 @@ const DEFAULT_BASKET_DATA: BasketData = {
   preAuthAmount: '',
   currency: 'TND',
   saleItems: [],
-  itemDetails: {
-    productName: '',
-    productCode: '',
-    amount: '',
-    quantity: '',
-    taxCode: '',
-    addProdCode: '',
-    reverseSale: '',
-    unitPrice: '',
-    unitMeasure: '',
-    saleChannel: '',
-    rebateLabel: '',
-    addProdInfo: '',
-    isSelected: false
-  },
   discount: '0.00'
 };
 
@@ -709,21 +694,6 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
       preAuthAmount: '',
       currency: 'TND',
       saleItems: [],
-      itemDetails: {
-        productName: '',
-        productCode: '',
-        amount: '',
-        quantity: '',
-        taxCode: '',
-        addProdCode: '',
-        reverseSale: '',
-        unitPrice: '',
-        unitMeasure: '',
-        saleChannel: '',
-        rebateLabel: '',
-        addProdInfo: '',
-        isSelected: false
-      },
       discount: '0.00'
     };
     this.loyaltyData = {

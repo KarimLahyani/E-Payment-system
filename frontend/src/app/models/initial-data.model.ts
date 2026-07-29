@@ -36,21 +36,7 @@ export const defaultInitialData = {
     totalAmount: '0.00',
     preAuthAmount: '0.00',
     currency: 'TND',
-    saleItems: [],
-    itemDetails: {
-      productName: '',
-      productCode: '',
-      amount: '',
-      quantity: '',
-      taxCode: '',
-      addProdCode: '',
-      reverseSale: '',
-      unitPrice: '',
-      unitMeasure: '',
-      saleChannel: '',
-      rebateLabel: '',
-      addProdInfo: ''
-    }
+    saleItems: []
   },
   loyaltyData: {
     loyaltyFlag: false,
@@ -126,20 +112,6 @@ export interface InitialData {
       rebateLabel: string;
       addProdInfo: string;
     }>;
-    itemDetails: {
-      itemId: string;
-      productCode: string;
-      amount: string;
-      quantity: string;
-      taxCode: string;
-      addProdCode: string;
-      reverseSale: string;
-      unitPrice: string;
-      unitMeasure: string;
-      saleChannel: string;
-      rebateLabel: string;
-      addProdInfo: string;
-    };
   };
   loyaltyData: {
     loyaltyFlag: boolean;
