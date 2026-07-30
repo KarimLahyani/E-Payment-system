@@ -7,99 +7,7 @@ const { addMessageToSend, updateConfigData: updateTcpConfigData, restartTcpServe
 let lastServiceRequest = '';
 
 const setupRoutes = (app) => {
-  // Function to handle LoyaltyAwardRefund
-  const handleLoyaltyAwardRefund = async (stan, currentRequestId) => {
-    try {
-      console.log(`Handling LoyaltyAwardRefund for STAN=${stan}, RequestID=${currentRequestId}`);
 
-      // Step 1: Find the most recent LoyaltyAward request
-      const loyaltyAwardResponseResult = await pool.query(
-        `SELECT id, stan 
-         FROM response_info 
-         WHERE request_type = 'LoyaltyAward' 
-         AND stan = $1 
-         ORDER BY id DESC LIMIT 1`,
-        [stan]
-      );
-
-      if (loyaltyAwardResponseResult.rows.length === 0) {
-        console.error(`No LoyaltyAward response found with stan: ${stan}`);
-        return { success: false, message: 'No matching LoyaltyAward response found with the provided STAN.' };
-      }
-
-      const loyaltyAwardRequestId = loyaltyAwardResponseResult.rows[0].id;
-      console.log(`Found LoyaltyAward response with id: ${loyaltyAwardRequestId}, stan: ${stan}`);
-
-      // Step 2: Find all basket_data entries for the LoyaltyAward request
-      const basketDataResult = await pool.query(
-        'SELECT id, total_amount, pre_auth_amount, currency FROM basket_data WHERE request_info_id = $1 ORDER BY created_at',
-        [loyaltyAwardRequestId]
-      );
-
-      if (basketDataResult.rows.length === 0) {
-        console.error(`No basket_data found for LoyaltyAward request id: ${loyaltyAwardRequestId}`);
-        return { success: false, message: 'No basket data found for the LoyaltyAward request.' };
-      }
-
-      // Find the row with the highest total_amount
-      let highestBasketData = basketDataResult.rows[0];
-      for (const row of basketDataResult.rows) {
-        if (parseFloat(row.total_amount) > parseFloat(highestBasketData.total_amount)) {
-          highestBasketData = row;
-        }
-      }
-
-      const originalBasketDataId = highestBasketData.id;
-      const originalTotalAmount = highestBasketData.total_amount;
-      const preAuthAmount = highestBasketData.pre_auth_amount || '';
-      const currency = highestBasketData.currency || 'TND';
-      
-      console.log(`Highest total_amount found: ${originalTotalAmount} with basket_data.id: ${originalBasketDataId}`);
-
-      // Step 3: Insert a new row in basket_data with the original total_amount
-      const newBasketResult = await pool.query(
-        'INSERT INTO basket_data (total_amount, pre_auth_amount, currency, request_info_id, created_at) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP) RETURNING id',
-        [originalTotalAmount, preAuthAmount, currency, currentRequestId]
-      );
-      const newBasketDataId = newBasketResult.rows[0].id;
-      console.log(`Successfully inserted new row in basket_data with id ${newBasketDataId} and total_amount ${originalTotalAmount} for request_info_id ${currentRequestId}`);
-
-      // Step 4: Copy the original sale items to the new basket_data
-      const originalSaleItemsResult = await pool.query(
-        'SELECT * FROM sale_items WHERE basket_data_id = $1',
-        [originalBasketDataId]
-      );
-
-      const saleItemsQuery = `
-        INSERT INTO sale_items (basket_data_id, product_code, amount, quantity, add_prod_code, reverse_sale, sale_channel, rebate_label, add_prod_info, pump_id, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
-        RETURNING *
-      `;
-
-      for (const item of originalSaleItemsResult.rows) {
-        const saleItemValues = [
-          newBasketDataId,             // basket_data_id (new)
-          item.product_code || '',     // product_code
-          item.amount,                 // amount
-          item.quantity || '',         // quantity
-          item.add_prod_code || '',    // add_prod_code
-          item.reverse_sale || '0',    // reverse_sale
-          item.sale_channel || '',     // sale_channel
-          '',                          // rebate_label (reset to empty)
-          item.add_prod_info || '',    // add_prod_info
-          item.pump_id || ''           // pump_id
-        ];
-
-        const result = await pool.query(saleItemsQuery, saleItemValues);
-        console.log(`Restored original sale_item with amount ${item.amount} for basket_data_id ${newBasketDataId}`);
-      }
-
-      return { success: true, message: 'LoyaltyAward discounts undone successfully.' };
-    } catch (error) {
-      console.error(`Error during LoyaltyAwardRefund processing for STAN=${stan}:`, error);
-      return { success: false, message: 'Error during LoyaltyAwardRefund processing: ' + error.message };
-    }
-  };
 
   // Endpoint pour récupérer le dernier message CashierTerminal
 
@@ -205,11 +113,8 @@ const setupRoutes = (app) => {
 
     clearDeviceMessages();
 
-    // Handle LoyaltyAwardRefund before generating the XML
-    let refundResult = { success: true, message: '' };
     let nextRequestId;
-
-    if (updatedRequestData.requestType === 'LoyaltyAwardRefund' && updatedRequestData.stan) {
+    // Insert into request_info
       const requestResult = await pool.query(
         'INSERT INTO request_info (request_type, pop_id, ref_number, workstation_id, app_sender, stan, request_timestamp) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP) RETURNING id',
         [
@@ -218,41 +123,11 @@ const setupRoutes = (app) => {
           updatedRequestData.refNumber || null,
           updatedRequestData.workId || null,
           updatedRequestData.appSender || null,
-          
-          updatedRequestData.reprintSearchType === 'requestId' ? (updatedRequestData.originalRequestId || null) : (updatedRequestData.stan || null),
-        ]
-      );
-      nextRequestId = requestResult.rows[0].id;
-      console.log('Inserted request_info for LoyaltyAwardRefund with id:', nextRequestId);
-
-      refundResult = await handleLoyaltyAwardRefund(updatedRequestData.stan, nextRequestId);
-      if (!refundResult.success) {
-        const result = await pool.query(
-          `INSERT INTO response_info (id, request_type, overall_result, stan, created_at)
-           VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-           ON CONFLICT (id) DO UPDATE 
-           SET request_type = $2, overall_result = $3, stan = $4`,
-          [nextRequestId, updatedRequestData.requestType, 'Failed', updatedRequestData.stan]
-        );
-        console.log(`Inserted/Updated response_info for failed LoyaltyAwardRefund request with id ${nextRequestId}`);
-        return res.status(400).json({ message: refundResult.message });
-      }
-    } else {
-      const requestResult = await pool.query(
-        'INSERT INTO request_info (request_type, pop_id, ref_number, workstation_id, app_sender, stan, request_timestamp) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP) RETURNING id',
-        [
-          updatedRequestData.requestType || null,
-          updatedRequestData.popId || null,
-          updatedRequestData.refNumber || null,
-          updatedRequestData.workId || null,
-          updatedRequestData.appSender || null,
-          
           updatedRequestData.reprintSearchType === 'requestId' ? (updatedRequestData.originalRequestId || null) : (updatedRequestData.stan || null),
         ]
       );
       nextRequestId = requestResult.rows[0].id;
       console.log('Inserted new request_info with id:', nextRequestId);
-    }
 
     // Mettre à  jour updatedRequestData.requestId avec l'id généré
     updatedRequestData.requestId = nextRequestId.toString();
@@ -287,7 +162,7 @@ const setupRoutes = (app) => {
         );
       }
 
-      if (basketData && updatedRequestData.requestType !== 'LoyaltyAwardRefund') {
+      if (basketData) {
         const { totalAmount, preAuthAmount, currency, itemDetails } = basketData;
         try {
           const basketResult = await pool.query(

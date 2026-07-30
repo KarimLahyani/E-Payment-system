@@ -47,7 +47,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
   let rootTag, schemaLocation, ipAddressAttr = '';
   
   // Condition pour ServiceRequest
-  if (requestType === 'Login' || requestType === 'Logoff' || requestType === 'TicketReprint') {
+  if (requestType === 'TicketReprint') {
     rootTag = 'ServiceRequest';
     schemaLocation = 'xsi:schemaLocation="http://www.nrf-arts.org/IXRetail/namespace ./IFSF/XSD/ServiceRequest.xsd"';
     const ipAddress = getLocalIPAddress();
@@ -84,42 +84,8 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
     const posDataLine7 = `    </POSData>`;
 
     posDataSection = [posDataLine1, posDataLine2, posDataLine3, posDataLine4, posDataLine5, posDataLine6, posDataLine7].filter(line => line).join('\n');
-  } else if (requestType === 'LoyaltyAwardRefund') {
-    const languageCode = String(posData?.languageCode || 'de').trim();
-    const shiftNumber = String(posData?.shiftNumber || '').trim();
-    const clerkId = String(posData?.clerkId || '').trim();
-    const transactionNumber = String(posData?.transactionNumber || '').trim();
 
-    const cardEntryMode = String(posData?.cardEntryMode || '').trim();
-    const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
-
-    const posDataLine1 = `    <POSData LanguageCode="${languageCode}"${cardEntryAttr}${splitAttr}>`;
-    const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
-    const posDataLine3 = shiftNumber ? `        <ShiftNumber>${shiftNumber}</ShiftNumber>` : '';
-    const posDataLine4 = clerkId ? `        <ClerkID>${clerkId}</ClerkID>` : '';
-    const posDataLine5 = transactionNumber ? `        <TransactionNumber>${transactionNumber}</TransactionNumber>` : '';
-    const posDataLine6 = `    </POSData>`;
-
-    posDataSection = [posDataLine1, posDataLine2, posDataLine3, posDataLine4, posDataLine5, posDataLine6].filter(line => line).join('\n');
-  } else if (requestType === 'PaymentRefundLoyaltyRedemptionRefund') {
-    const languageCode = String(posData?.languageCode || 'de').trim();
-    const shiftNumber = String(posData?.shiftNumber || '').trim();
-    const clerkId = String(posData?.clerkId || '').trim();
-    const clerkLevel = String(posData?.clerkLevel || '5').trim();
-    const transactionNumber = String(posData?.transactionNumber || '').trim();
-    const track2 = String(posData?.track2 || '').trim();
-    const cardEntryMode = String(posData?.cardEntryMode || '').trim();
-    const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
-
-    const posDataLine1 = `    <POSData LanguageCode="${languageCode}" ClerkLevel="${clerkLevel}"${track2 ? ` Track2="${track2}"` : ''}${cardEntryAttr}${splitAttr}>`;
-    const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
-    const posDataLine3 = shiftNumber ? `        <ShiftNumber>${shiftNumber}</ShiftNumber>` : '';
-    const posDataLine4 = clerkId ? `        <ClerkID>${clerkId}</ClerkID>` : '';
-    const posDataLine5 = transactionNumber ? `        <TransactionNumber>${transactionNumber}</TransactionNumber>` : '';
-    const posDataLine6 = `    </POSData>`;
-
-    posDataSection = [posDataLine1, posDataLine2, posDataLine3, posDataLine4, posDataLine5, posDataLine6].filter(line => line).join('\n');
-  } else if (requestType === 'Login' || requestType === 'Logoff' || requestType === 'TicketReprint') {
+  } else if (requestType === 'TicketReprint') {
     const languageCode = String(posData?.languageCode || 'pt').trim();
     const clerkLevel = String(posData?.clerkLevel || '5').trim();
     const unattended = String(posData?.unattended || 'false').trim();
@@ -138,7 +104,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
     const posDataLine5 = `    </POSData>`;
 
     posDataSection = [posDataLine1, posDataLine2, posDataLine3, posDataLine5].filter(line => line).join('\n');
-  } else if (requestType === 'CardPayment' || requestType === 'LoyaltyBalanceQuery') {
+  } else if (requestType === 'CardPayment') {
     const clerkLevel = String(posData?.clerkLevel || '5').trim();
     const languageCode = String(posData?.languageCode || 'es').trim();
     const cardEntryMode = String(posData?.cardEntryMode || '').trim();
@@ -157,17 +123,8 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
     const posDataLine3 = `    </POSData>`;
     posDataSection = [posDataLine1, posDataLine2, posDataLine3].filter(line => line).join('\n');
   }
-
   let originalTransactionSection = '';
-  if (requestType === 'PaymentRefundLoyaltyRedemptionRefund' && basketData?.originalTransaction) {
-    const terminalId = String(basketData.originalTransaction.terminalId || '').trim();
-    const terminalBatch = String(basketData.originalTransaction.terminalBatch || '').trim();
-    const stan = String(basketData.originalTransaction.stan || '').trim();
-
-    if (terminalId && terminalBatch && stan) {
-      originalTransactionSection = `    <OriginalTransaction TerminalID="${terminalId}" TerminalBatch="${terminalBatch}" STAN="${stan}"></OriginalTransaction>`;
-    }
-  } else if ((requestType === 'LoyaltyAwardRefund' || requestType === 'TicketReprint') && (requestData?.stan || requestData?.originalRequestId)) {
+  if ((requestType === 'TicketReprint') && (requestData?.stan || requestData?.originalRequestId)) {
     try {
       let result;
       let searchValue;
@@ -214,7 +171,6 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
   }
 
   let loyaltySection = '';
-  if (requestType !== 'Login' && requestType !== 'Logoff') { // Exclure Loyalty pour Login et Logoff
     if (requestType === 'LoyaltyAward' && loyaltyData) {
       const cardEntryMode = String(loyaltyData.cardEntryMode || 'Scanner').trim();
       const loyaltyCard = String(loyaltyData.loyaltyCard || '').trim();
@@ -225,7 +181,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
       const loyaltyLine3 = `    </Loyalty>`;
 
       loyaltySection = [loyaltyLine1, loyaltyLine2, loyaltyLine3].filter(line => line).join('\n');
-    } else if ((requestType === 'PaymentRefundLoyaltyRedemptionRefund' || requestType === 'CardPayment' || requestType === 'LoyaltyBalanceQuery') && loyaltyData) {
+    } else if (requestType === 'CardPayment' && loyaltyData) {
       const cardEntryMode = String(loyaltyData.cardEntryMode || 'Scanner').trim();
       const loyaltyCard = String(loyaltyData.loyaltyCard || '').trim();
 
@@ -235,10 +191,9 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
 
       loyaltySection = [loyaltyLine1, loyaltyLine2, loyaltyLine3].filter(line => line).join('\n');
     }
-  }
 
   let totalAmountSection = '';
-  if (requestType === 'LoyaltyAward' || requestType === 'LoyaltyAwardRefund' || requestType === 'PaymentRefundLoyaltyRedemptionRefund' || requestType === 'CardPayment') {
+    if (requestType === 'LoyaltyAward' || requestType === 'CardPayment') {
     const totalAmount = formatNumberWithLeadingZeros(basketData?.totalAmount || '0.00', 7, 2);
     const currency = String(basketData?.currency || 'TND').trim();
 
@@ -246,7 +201,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
   }
 
   let saleItemsSection = '';
-  if ((requestType === 'LoyaltyAward' || requestType === 'LoyaltyAwardRefund' || requestType === 'PaymentRefundLoyaltyRedemptionRefund' || requestType === 'CardPayment') && basketData?.saleItems && Array.isArray(basketData.saleItems)) {
+    if ((requestType === 'LoyaltyAward' || requestType === 'CardPayment') && basketData?.saleItems && Array.isArray(basketData.saleItems)) {
     const selectedItems = basketData.saleItems;
 
     if (selectedItems.length > 0) {

@@ -1,136 +1,185 @@
-# The Absolute Beginner's Guide to the IFSF Cashier Simulator
+# E-Payment System — IFSF Simulator Documentation
 
-Welcome! If you are completely new to web development, servers, or this specific project, you are in the right place. We are going to break down exactly what this application is, how it works, what its features are, and the exact business logic behind it. By the end of this document, you will be able to explain this app to anyone as if you built it from scratch yourself.
+## 1. System Overview
 
----
+This application simulates the full IFSF (International Forecourt Standards Forum) payment flow between a Cashier POS and a Payment Terminal. It is composed of three independent services that run concurrently:
 
-## 1. What is this Project?
+| Service | Technology | URL | Purpose |
+|---------|-----------|-----|---------|
+| **Frontend POS** | Angular | `http://localhost:4200` | The cashier interface — build baskets, send payments, view history |
+| **Backend EPS** | Node.js + PostgreSQL | `http://localhost:3000` | Translates JSON into IFSF XML, manages the database and TCP connections |
+| **Terminal Simulator** | Vanilla HTML/JS | `http://localhost:3000/simulator` | Simulates a physical card reader — card selection, PIN entry, receipts |
 
-Imagine a petrol station. When you pump gas and walk inside to pay, the cashier uses a computer (a Point of Sale, or POS) to scan your items, swipe your loyalty card, and process your credit card. 
-
-The physical fuel pump outside and the cashier's computer inside need a common language to talk to each other. In Europe and many other parts of the world, that language is **IFSF** (International Forecourt Standards Forum). 
-
-This project is a **Web-Based IFSF Simulator**. It completely mimics the behavior of the Cashier Terminal computer. Instead of needing real, expensive hardware (like a physical fuel pump and a physical cash register), this software simulates the cashier's screen on a web browser. It allows you to trigger test transactions, send loyalty cards, and reply to hardware prompts, packaging everything into perfectly formatted IFSF messages.
-
----
-
-## 2. Every Single Feature Explained
-
-If someone asks you, "What exactly can this app do?", here is the master list of every single feature and input field you control. 
-
-The frontend UI is divided into several sections (Components) that together build one massive IFSF request.
-
-### Feature 1: Base Request Information (`request-info`)
-This is where the core instruction is defined. What are we trying to do right now?
-- **Request Type**: The main action. You can select actions like `CardPayment` (paying with a card), `LoyaltyAward` (applying a loyalty card discount), `LoyaltyAwardRefund` (canceling a loyalty discount), `Login`, or `Logout`.
-- **STAN (System Trace Audit Number)**: A unique tracking number used in banking/payments to track a specific transaction across the network.
-- **Auto Increment**: A toggle that, when turned on, automatically generates a new Request ID every time you hit send, so you don't have to type it manually.
-- **Identifiers**: Fields like `POPID` (Point of Payment ID) and `WorkstationID` so the network knows exactly which register is making the request.
-
-### Feature 2: POS Data (`pos-data`)
-This section tells the network about the current physical state of the Cashier Terminal.
-- **Language Code**: (e.g., `en` for English).
-- **Shift Number & Clerk ID**: Identifies which employee is logged into the register.
-- **Card Entry Mode**: Tells the system how the card was read (e.g., swiped, inserted, or tapped via NFC).
-
-### Feature 3: Payment Amounts (`amount`)
-This section handles the money.
-- **Currency**: E.g., `EUR` or `USD`.
-- **Total Amount**: The final price the customer owes.
-- **Pre-Auth Amount**: Used primarily for petrol pumps where the system "reserves" money on your card before you start pumping.
-
-### Feature 4: The Shopping Cart / Sale Items (`sale-item`)
-The simulator generates up to 35 individual items that the cashier can add to the transaction.
-- Each item has an **Item ID**, **Product Code** (like a barcode), **Quantity**, and **Unit Price**.
-- If a discount is applied, it will show a **Rebate Label** and alter the final Amount of that specific item.
-
-### Feature 5: Loyalty Cards (`loyalty`)
-If the customer scans a club card.
-- **Loyalty PAN**: The actual card number of the loyalty card.
-- **Approval Code & Acquirer ID**: Details returned from the loyalty server when a discount is approved.
-
-### Feature 6: Asynchronous Cashier Prompts (`cashier-terminal-dialog`)
-Sometimes, the external hardware needs to ask the cashier a question in the middle of a transaction (e.g., "Customer forgot receipt, print again?").
-- The app has a background listener. If it receives a `CashierTerminal` prompt from the network, a popup dialog instantly appears on the Angular web UI.
-- The cashier clicks **YES** or **NO**.
-- The app translates that click into a binary `<InBoolean>1</InBoolean>` (YES) or `0` (NO) and sends it back to the hardware.
-
-### Feature 7: The "Undo Loyalty" Logic (Loyalty Award Refund)
-This is a very specific, highly intelligent feature built into the backend (`routes.js`).
-If a cashier sends a `LoyaltyAwardRefund` request (meaning the customer canceled their loyalty card halfway through):
-1. The backend searches the PostgreSQL database for the original transaction using the `STAN` tracking number.
-2. It looks at the original prices of the items *before* the discount was applied.
-3. It magically creates a new shopping cart in the database, undoing all discounts, resetting the `Rebate Labels`, and recalculating the original `Total Amount`.
+All three start simultaneously with a single `npm start` from the project root.
 
 ---
 
-## 3. The Big Picture: How Web Apps Work
+## 2. Supported Request Types
 
-Before we dive into the code, let's understand the architecture using a restaurant analogy.
+The system enforces a strict whitelist. Only the following operations are fully functional:
 
-1. **The Frontend (The Dining Room & Menu)**: This is what you see on your screen. It has buttons, text fields, and popups. In a restaurant, this is the menu you read and the waiter you talk to.
-2. **The Backend (The Kitchen)**: This is the hidden engine. It processes rules, talks to other computers, and saves data. In a restaurant, it's the kitchen cooking your food.
-3. **The Database (The Pantry/Ledger)**: Where all the permanent information is stored (like old receipts).
+| Request Type | Trigger | Description |
+|--------------|---------|-------------|
+| **CardPayment** | "Send" button | Standard payment. Sends the basket, POS data, and loyalty info to the terminal for card authorization. |
+| **TicketReprint** | "Send" button | Reprints a previous receipt. The cashier searches by STAN or by Request ID. The backend queries the database for the original transaction and sends a reprint command to the terminal. |
+| **Diagnosis** | "Send" button | Health check. The terminal instantly responds with "DIAGNOSIS OK" without any card interaction. |
+| **LoyaltyAward** | "Bonus" button | Applies loyalty discounts to the basket. This uses a dedicated flow (see Section 4) and is triggered via the green "Bonus" button, not via "Send". |
 
-In our project, these three parts are constantly talking to each other.
-
----
-
-## 4. The Technologies We Use
-
-### A. The Frontend: Angular
-**What is it?** Angular is a tool created by Google for building websites. It uses **HTML** (for structure), **CSS** (for styling), and **TypeScript** (a stricter version of JavaScript for logic).
-**Why use it?** It allows us to build a "Single Page Application" (SPA). This means when you click a button, the page doesn't go blank and reload. It instantly updates the screen.
-**Where is it?** Everything inside the `frontend/` folder.
-
-### B. The Backend: Node.js & Express
-**What is it?** Node.js allows us to run JavaScript code on our computer (the server). Express is a tiny framework built on top of Node.js that makes it easy to receive HTTP requests (like when the frontend asks for data).
-**Why use it?** It acts as the bridge. It takes button clicks from Angular and translates them into heavy network commands.
-**Where is it?** Everything inside the `backend/` folder.
-
-### C. The Network Protocol: TCP & XML
-**What is it?** **TCP** (Transmission Control Protocol) is a way for computers to open a continuous, open pipeline of communication. **XML** is a way of writing data using tags (like `<TotalAmount>20.00</TotalAmount>`). 
-**Why use it?** Real-world petrol station hardware uses TCP and XML. Our backend has to use exactly this method to successfully pretend to be a Cashier Terminal.
-
-### D. The Database: PostgreSQL
-**What is it?** A powerful, structured database system.
-**Why use it?** When we simulate a payment, we want to save the receipt (`request_info`, `sale_items`, `response_info`) so we can look at it later or perform Refunds.
+Any other request type (e.g. `Login`, `Logoff`, `PaymentRefund`) is blocked by the frontend with an alert: *"[Type] is not implemented yet."*
 
 ---
 
-## 5. A Tour of the Folders
+## 3. Main POS Interface
 
-Let's walk through your project folder by folder.
+The POS page (`/`) is divided into two columns:
 
-### `package.json` (Root Directory)
-This is the master instruction booklet. If you type `npm start`, this file tells the computer: *"Hey, launch the backend kitchen AND the frontend dining room at the exact same time."*
+### Left Column — Request Information
+- **Request Type**: Dropdown to select the operation.
+- **Ref Number / App Sender**: Identifiers included in the outbound IFSF XML header.
+- **Request ID**: Auto-incremented per transaction. Cannot be manually edited.
+- **POPID / Workstation ID**: Hardware identifiers for the POS terminal.
+- **STAN**: System Trace Audit Number. Auto-filled on responses, but editable for `TicketReprint` searches.
 
-### `/frontend` (The Angular App)
-- **`src/app/`**: This is where all the visual blocks (called **Components**) live. Every feature mentioned above (`amount`, `loyalty`, `pos-data`) has its own dedicated folder here containing its HTML and logic.
-- **`src/app/services/`**: These are the "waiters". When a component needs data from the kitchen (backend), it uses a service to make an HTTP request (like saving the transaction).
-- **`src/app/models/`**: Contains TypeScript interfaces. This defines the strict shape of our data so the app doesn't accidentally send letters instead of numbers for prices.
+### Right Column — Response Information
+Displays the parsed XML response from the terminal once a transaction completes, including `OverallResult`, `ErrorCondition`, `TerminalID`, and `STAN`.
 
-### `/backend` (The Node.js Server)
-- **`server.js`**: The main power switch for the backend. It starts the engine.
-- **`routes.js`**: The order ticket window. It receives all the data from the Angular forms and decides what to do with it (like executing the Loyalty Refund logic).
-- **`tcpHandler.js`**: The most complex part. This opens the raw TCP network socket. It listens for incoming XML messages, processes them, handles timeouts, and sends XML replies.
-- **`xmlGenerator.js`**: A master translator. It takes the plain JSON data from Angular and builds the massive, complex IFSF XML strings required by the hardware.
-- **`database.js`**: The file that logs into your PostgreSQL database.
+### Action Buttons
+| Button | Function |
+|--------|----------|
+| **Send** | Submits the current request to the backend → terminal pipeline. Disabled during `LoyaltyAward`. |
+| **Clear** | Resets all form fields. |
+| **Abort** | Cancels a transaction mid-flight. The terminal receives an abort signal. |
+| **Bonus** | Triggers the loyalty discount flow (see Section 4). Only enabled when `LoyaltyAward` is selected. |
+| **New Transaction** | Resets the entire POS state for a fresh transaction. |
+| **History** | Navigates to the Transaction History page. |
+| **Configuration** | Opens a modal to edit connection settings (EPS IP/Port). |
+
+### Sub-Tabs
+Below the action buttons, three tabs provide additional configuration:
+- **POS Data**: Language code, shift number, clerk ID, card entry mode.
+- **Basket**: Product catalog (fetched from the database), quantity inputs, total amount calculation.
+- **Loyalty**: Loyalty card number (PAN) and card entry mode for loyalty operations.
+
+### Devices Section
+At the bottom of the page:
+- **Display**: Shows the current terminal screen text (e.g. "ENTER PIN", "APPROVED").
+- **Printer Receipt**: Renders the receipt text returned by the terminal in a monospaced font.
 
 ---
 
-## 6. Step-by-Step Example: Triggering a Card Payment
+## 4. Loyalty Discount Flow
 
-To really understand how everything works together, here is the exact chronological flow of a Card Payment:
+When the cashier selects `LoyaltyAward` and clicks the **Bonus** button:
 
-1. **The Cashier (You)**: Fills out the `request-info` form, sets Amount to 50 EUR, and clicks "Send Request" on the Angular UI.
-2. **The Waiter (Angular)**: The `request-info.service.ts` gathers all your inputs into a single JSON object and sends an HTTP POST request to the backend.
-3. **The Kitchen (Node.js)**: `routes.js` receives the data. It saves a record of the transaction into the PostgreSQL database (`INSERT INTO request_info...`).
-4. **The Translator**: `routes.js` hands the data to `xmlGenerator.js`, which spits out a massive `<CardServiceRequest>` XML string.
-5. **The Network (TCP)**: `tcpHandler.js` takes that XML string and shoots it across a TCP port (22222) to the external payment controller.
-6. **The Response**: The external payment controller approves the payment and sends back a `<CardServiceResponse>` XML over TCP.
-7. **The Update**: `tcpHandler.js` reads the response, sees `OverallResult="Success"`, and saves that Success to the database.
-8. **The UI Update**: The Angular `response-info` component (which is constantly polling the backend) sees the new response and displays a bright green "Success" message to the cashier!
+1. The frontend sends the basket items and the loyalty PAN to the backend.
+2. The backend loads `terminal-simulator/src/discounts.json`, which defines discount rules per card type:
+   ```json
+   {
+     "Premium Loyalty": {
+       "discountPercentage": 15.0,
+       "rebateLabel": "Premium Reward - 15% Off",
+       "applicableProducts": ["101", "102"]
+     }
+   }
+   ```
+3. Eligible items in the basket have their prices reduced and a `rebateLabel` is applied.
+4. The UI updates the basket total to reflect the discounted prices. Original prices are shown with a strikethrough.
+5. The cashier then switches to `CardPayment` and clicks **Send** to authorize the discounted amount.
 
-## Summary
-You now know everything there is to know about this application. You know the features it simulates, the exact technologies it uses, the folder structure it lives in, and the chronological flow of how data moves from a simple button click down to a raw TCP network socket!
+The resulting `CardPayment` transaction is **linked** to the original `LoyaltyAward` via a `linkedToId`, which appears as a clickable tag in the Transaction History.
+
+---
+
+## 5. Split Payment Flow
+
+When split mode is enabled in POS Data, clicking **Send** opens a modal instead of sending immediately:
+
+1. The modal shows the **Total Basket Amount** and a field to enter the amount to charge now.
+2. Quick-select buttons (25%, 33%, 50%, 75%) pre-fill common splits.
+3. On "Confirm & Send", only the specified amount is sent as a `CardPayment`.
+4. After the terminal responds, the POS updates the **Paid Amount** and **Remaining Balance** in a status bar.
+5. The cashier clicks **Send** again for the next chunk, repeating until the full amount is covered.
+
+Each split chunk is saved as a separate `request_info` row in the database with its own response. In the Transaction History, split transactions are grouped together and can be expanded to see each individual payment.
+
+---
+
+## 6. Transaction History Page
+
+Accessible via the **History** button or the `/history` route.
+
+### Table Columns
+| Column | Content |
+|--------|---------|
+| Req ID | Database primary key |
+| Date & Time | Timestamp of the request |
+| Request Type | `CardPayment`, `TicketReprint`, `LoyaltyAward`, etc. |
+| Amount | Basket total. Shows original price struck through if a discount was applied. Split transactions display a yellow "Split" badge. |
+| STAN | The System Trace Audit Number returned by the terminal |
+| Customer / Card | Cardholder name and masked card number (last 4 digits only) |
+| Result | Color-coded badge: green (Success), red (Failed), orange (Partial), gray (Aborted), yellow (Pending) |
+
+### Features
+- **Filters**: Date range (From/To), status (Success/Failed/Pending), and a "Clear Filters" reset.
+- **Pagination**: 10, 50, 100 per page, or "All" in a scrollable view.
+- **Total Revenue**: Displayed at the top — sum of all successful transaction amounts.
+- **Detail Modal**: Clicking any row opens a detailed view showing Request Info, Response Info, POS Data, Payment Details, Loyalty Information, and a full Basket & Items table with per-item rebate breakdowns.
+- **Linked Transactions**: `CardPayment` transactions that followed a `LoyaltyAward` show a clickable "Linked to #X" badge that jumps to the original loyalty transaction.
+- **Split Breakdown**: Grouped split transactions show a table of each individual payment with its own STAN, amount, customer, and status.
+
+---
+
+## 7. Terminal Simulator
+
+The simulator (`/simulator`) emulates a physical EPT (Electronic Payment Terminal).
+
+### Card System
+- Cards are stored in the PostgreSQL `cards` table with fields: name, type, PAN, expiry, passcode, balance, status.
+- Default cards are seeded on first startup (e.g. "Karim Lahyani" — Premium Loyalty, "John Doe" — Standard Corporate).
+- New cards can be created directly from the simulator UI.
+- Cards can be `ACTIVE`, `BLOCKED`, or expired (based on expiry date).
+
+### Transaction Flow
+1. The simulator receives an XML `CardServiceRequest` via WebSocket.
+2. It parses the request type, amount, and items.
+3. The cashier selects a card and clicks "Insert Card".
+4. The terminal prompts for PIN entry via a numeric keypad.
+5. Validation checks: card status, expiry, PIN, and balance.
+6. On success: deducts the amount from the card balance, builds a `CardServiceResponse` XML with `OverallResult="Success"`, and returns it.
+7. The receipt is generated and sent back to the POS Display/Printer.
+
+### Special Handling
+- **Diagnosis**: Intercepted before any card logic. Returns instant success.
+- **LoyaltyAward**: Processes discount rules from `discounts.json` and returns the modified basket without touching card balances.
+
+---
+
+## 8. Database Schema
+
+| Table | Purpose |
+|-------|---------|
+| `request_info` | Core transaction record — request type, POPID, workstation ID, STAN, timestamp |
+| `pos_data` | POS metadata — language, clerk ID, shift number, card entry mode, split flag |
+| `basket_data` | Transaction amounts — total, pre-auth, currency |
+| `sale_items` | Individual line items — product code, quantity, amount, rebate label |
+| `loyalty` | Loyalty card details — PAN, card entry mode, bonus flag, discount amounts |
+| `response_info` | Terminal response — overall result, error condition, STAN, terminal ID, card number, customer name |
+| `products` | Product catalog — name, code, unit price, unit measure, tax code |
+| `cards` | Simulated card profiles — name, type, PAN, expiry, passcode, balance, status |
+
+---
+
+## 9. Key Files
+
+| File | Role |
+|------|------|
+| `backend/routes.js` | HTTP API endpoints, database insertions, XML dispatch |
+| `backend/xmlGenerator.js` | Builds IFSF-compliant XML from JSON input |
+| `backend/tcpHandler.js` | TCP socket management for physical EPT connections (port `22222`) |
+| `backend/server.js` | Express server initialization, Socket.IO setup |
+| `backend/init_db.sql` | Database schema and seed data |
+| `frontend/src/app/request-info/` | Main POS component — forms, buttons, split modal, bonus logic |
+| `frontend/src/app/transaction-history/` | History page — table, filters, pagination, detail modal |
+| `frontend/src/app/basket/` | Shopping cart component — product selection, quantity, totals |
+| `terminal-simulator/src/app.js` | Full terminal simulator logic — card validation, PIN, receipts, XML responses |
+| `terminal-simulator/src/discounts.json` | Loyalty discount rules per card type |

@@ -388,6 +388,12 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
   }
 
   sendRequest() {
+    const implementedTypes = ['CardPayment', 'TicketReprint', 'Diagnosis'];
+    if (!implementedTypes.includes(this.requestData.requestType)) {
+      alert(this.requestData.requestType + ' is not implemented yet.');
+      return;
+    }
+
     if (this.posData.split) {
       const total = parseFloat(this.basketData.totalAmount) || 0;
       const remaining = Math.max(0, total - this.paidAmount);
@@ -425,7 +431,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     const requestBasketData = JSON.parse(JSON.stringify(this.basketData));
     // Keep a reference to the real total for split receipts logic
     requestBasketData.originalTotalAmount = this.basketData.totalAmount;
-    
+
     const requestPosData = JSON.parse(JSON.stringify(this.posData));
 
     if (amountToSend) {
@@ -550,7 +556,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
   }
 
   isBonusButtonEnabled(): boolean {
-    return this.requestData.requestType === 'LoyaltyAward' || this.requestData.requestType === 'LoyaltyAwardRefund';
+    return this.requestData.requestType === 'LoyaltyAward';
   }
 
   onBonusClick() {
@@ -776,15 +782,15 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
 
       if (data && data.cardServiceResponse?.attributes?.overallResult === 'Success') {
         const isLoyaltyAward = data.cardServiceResponse.attributes.requestType === 'LoyaltyAward';
-        
+
         if (isLoyaltyAward) {
           const tenderAmount = data.cardServiceResponse.tender?.totalAmount;
           const saleItems = data.cardServiceResponse.saleItem || [];
-          
+
           if (tenderAmount) {
             this.basketData.totalAmount = typeof tenderAmount === 'object' ? tenderAmount.value : tenderAmount;
           }
-          
+
           if (saleItems && saleItems.length > 0) {
             saleItems.forEach((incomingItem: any) => {
               const matchedItem = this.basketData.saleItems.find(bItem => bItem.productCode === incomingItem.productCode);
@@ -794,11 +800,11 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
               }
             });
           }
-          
+
           this.requestInfoService.updateData({ basketData: this.basketData });
           // alert("Discounts applied! Please select CardPayment and click Send to complete the transaction.");
         }
-        
+
         if (this.posData.split && amountToSend) {
           this.paidAmount += parseFloat(amountToSend);
           if (this.remainingBalance <= 0.001) {
@@ -820,13 +826,13 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
 
       this.isLoading = false;
       this.activeResponseRequestId = null;
-      
+
       // FIX FOR ID: update the form's Request ID to the NEXT ID immediately after response finishes
       const nextId = (Number(requestId) + 1).toString();
       this.currentRequestId = nextId;
       this.requestData = { ...this.requestData, requestId: nextId };
       this.requestInfoService.updateData({ requestData: this.requestData });
-      
+
       this.cdr.detectChanges();
       console.log("Response fully received!");
     };

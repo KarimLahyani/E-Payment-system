@@ -716,7 +716,7 @@
       if (decision.approved && state.transaction.type === 'Sale' && state.transaction.requestType !== 'LoyaltyAward') {
         card.balance -= state.transaction.amount;
         fetch(`http://localhost:3000/api/cards/${card.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ balance: card.balance }) }).catch(console.error);
-      } else if (decision.approved && state.transaction.type === 'Refund' && state.transaction.requestType !== 'LoyaltyAwardRefund') {
+      } else if (decision.approved && state.transaction.type === 'Refund') {
         card.balance += state.transaction.amount;
         fetch(`http://localhost:3000/api/cards/${card.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ balance: card.balance }) }).catch(console.error);
       }
