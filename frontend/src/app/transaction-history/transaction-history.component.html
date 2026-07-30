@@ -341,7 +341,9 @@
           <!-- Payment Details -->
           <div class="bg-gray-50 p-4 rounded-lg border border-gray-200"
             *ngIf="selectedTransaction.requestInfo.requestType !== 'TicketReprint' && !selectedTransaction.isGroup">
-            <h4 class="text-md font-bold text-gray-800 mb-3 border-b pb-2">Payment Details</h4>
+            <h4 class="text-md font-bold text-gray-800 mb-3 border-b pb-2">
+              {{ selectedTransaction.requestInfo.requestType === 'LoyaltyAward' ? 'Loyalty Card Details' : 'Payment Details' }}
+            </h4>
             <div class="grid grid-cols-2 gap-2 text-sm"
               *ngIf="selectedTransaction.responseInfo && (selectedTransaction.responseInfo.customerName || selectedTransaction.responseInfo.cardNumber); else noPaymentData">
               <div class="text-gray-500">Customer Name:</div>
@@ -355,22 +357,7 @@
             </ng-template>
           </div>
 
-          <!-- Loyalty Data -->
-          <div class="bg-gray-50 p-4 rounded-lg border border-gray-200"
-            *ngIf="selectedTransaction.requestInfo.requestType !== 'TicketReprint'">
-            <h4 class="text-md font-bold text-gray-800 mb-3 border-b pb-2">Loyalty Information</h4>
-            <div class="grid grid-cols-2 gap-2 text-sm"
-              *ngIf="selectedTransaction.loyalty && selectedTransaction.loyalty.loyaltyFlag; else noLoyaltyData">
-              <div class="text-gray-500">Card Present:</div>
-              <div class="font-medium text-gray-900">Yes</div>
 
-              <div class="text-gray-500">Card Number:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.loyalty.loyaltyPan || '-' }}</div>
-
-              <div class="text-gray-500">Amount:</div>
-              <div class="font-medium text-gray-900">{{ selectedTransaction.loyalty.loyaltyAmount || '-' }}</div>
-            </div>
-          </div>
 
           <!-- Sale Items (Spans full width) -->
           <div class="md:col-span-2 bg-gray-50 p-4 rounded-lg border border-gray-200"

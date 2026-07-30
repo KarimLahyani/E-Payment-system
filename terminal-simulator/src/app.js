@@ -785,27 +785,30 @@
           const loyaltyDate = new Date().toISOString().substring(0, 19);
           loyaltyXml = `
   <Loyalty CardCircuit="${card.card_type}" CardEntryMode="Swipe" LoyaltyTimeStamp="${loyaltyDate}">
-    <LoyaltyCard>3B3730353638343032313935343132373738363D333031303536353030303030383030303030</LoyaltyCard>
+    <CustomerName>${card.name}</CustomerName>
+    <LoyaltyCard>${card.number}</LoyaltyCard>
     <LoyaltyApprovalCode>${decision.authCode || '123456'}</LoyaltyApprovalCode>
   </Loyalty>`;
         }
       }
 
-      const finalResponseXml = `<?xml version="1.0" encoding="ISO-8859-1" standalone="no"?>
-<CardServiceResponse ApplicationSender="TerminalSimulator" POPID="${popId}" RequestID="${reqId}" WorkstationID="${workstationId}" RequestType="${state.transaction.requestType || 'CardPayment'}" OverallResult="${decision.approved ? "Success" : "Failure"}"${errorAttr} xmlns="http://www.nrf-arts.org/IXRetail/namespace" xmlns:IFSF="http://www.ifsf.org/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.nrf-arts.org/IXRetail/namespace ./IFSF/XSD/CardServiceResponse.xsd">
-  <Terminal>
-    <TerminalID>TERM01</TerminalID>
-    <STAN>${state.transaction.stan}</STAN>
-  </Terminal>
-  <Tender>
-    <TotalAmount>${totalAmount}</TotalAmount>
-  </Tender>
+      let cardXml = '';
+      if (!isLoyalty) {
+        cardXml = `
   <Card>
     <PAN>${card.number.slice(0, 6)}******${card.number.slice(-4)}</PAN>
     <ExpiryDate>${card.expiry.replace('-', '')}</ExpiryDate>
     <CustomerName>${card.name}</CustomerName>
     <AuthCode>${decision.authCode || ''}</AuthCode>
-  </Card>${loyaltyXml}${saleItemsXml}
+  </Card>`;
+      }
+
+      const finalResponseXml = `<?xml version="1.0" encoding="ISO-8859-1" standalone="no"?>
+<CardServiceResponse ApplicationSender="TerminalSimulator" POPID="${popId}" RequestID="${reqId}" WorkstationID="${workstationId}" RequestType="${state.transaction.requestType || 'CardPayment'}" OverallResult="${decision.approved ? "Success" : "Failure"}"${errorAttr} xmlns="http://www.nrf-arts.org/IXRetail/namespace" xmlns:IFSF="http://www.ifsf.org/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.nrf-arts.org/IXRetail/namespace ./IFSF/XSD/CardServiceResponse.xsd">
+  <Terminal STAN="${state.transaction.stan || '000000'}" TerminalBatch="5753" TerminalID="TERM01"/>
+  <Tender>
+    <TotalAmount Currency="${state.transaction.currency || 'TND'}">${totalAmount}</TotalAmount>
+  </Tender>${cardXml}${loyaltyXml}${saleItemsXml}
 </CardServiceResponse>`;
 
         let shouldPrintReceipt = true;

@@ -277,8 +277,8 @@ const processCardServiceResponse = async (responseXML) => {
     
     console.log(`Extracted totalAmount: ${totalAmount}, Raw TotalAmount object: ${JSON.stringify(cardServiceResponse.Tender?.TotalAmount)}`);
 
-    const cardNumber = cardServiceResponse.Card?.PAN || null;
-    const customerName = cardServiceResponse.Card?.CustomerName || null;
+    const cardNumber = cardServiceResponse.Card?.PAN || cardServiceResponse.Loyalty?.LoyaltyCard || null;
+    const customerName = cardServiceResponse.Card?.CustomerName || cardServiceResponse.Loyalty?.CustomerName || null;
     const authCode = cardServiceResponse.PaymentReceipt?.RequiredSignature?.AuthCode || cardServiceResponse.Card?.AuthCode || cardServiceResponse.Loyalty?.LoyaltyApprovalCode || null;
 
     // Insérer ou mettre à jour response_info
