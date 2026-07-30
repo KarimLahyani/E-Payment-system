@@ -286,7 +286,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
     this.requestInfoService.getLastRequestInfo().subscribe(
       (data: RequestData) => {
         this.requestData = { ...this.requestData, ...data };
-        if (this.requestData.requestType !== 'LoyaltyAwardRefund' && this.requestData.requestType !== 'TicketReprint') {
+        if (this.requestData.requestType !== 'TicketReprint') {
           this.requestData.stan = '';
         }
         if (data.clientIp && data.serverIp && data.epsPort && data.posProxyPort !== undefined && data.opiMode !== undefined) {
@@ -497,33 +497,11 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
   onRequestTypeChange() {
     this.updateFieldStates();
     this.requestTypeService.changeRequestType(this.requestData.requestType);
-    if (this.requestData.requestType === 'LoyaltyAwardRefund') {
-      this.requestInfoService.getLastLoyaltyAwardStan().subscribe(
-        (response: { stan: string }) => {
-          if (response && response.stan) {
-            this.requestData.stan = response.stan;
-            console.log('Set stan for LoyaltyAwardRefund from last LoyaltyAward response:', this.requestData.stan);
-          } else {
-            this.requestData.stan = '';
-            console.warn('No previous LoyaltyAward response found to set stan.');
-          }
-          this.requestInfoService.updateData({ requestData: this.requestData });
-          this.cdr.detectChanges();
-        },
-        (error) => {
-          console.error('Error fetching last LoyaltyAward stan:', error);
-          this.requestData.stan = '';
-          this.requestInfoService.updateData({ requestData: this.requestData });
-          // alert('Erreur lors de la récupération du dernier STAN pour LoyaltyAward.');
-          this.cdr.detectChanges();
-        }
-      );
-    } else {
+    if (this.requestData.requestType !== 'TicketReprint') {
       this.requestData.stan = '';
-      this.requestInfoService.updateData({ requestData: this.requestData });
     }
+    this.requestInfoService.updateData({ requestData: this.requestData });
   }
-
   showSubSection(section: string) {
     this.activeSection = section;
     this.router.navigate([`/request-info/${section}`]);
@@ -609,8 +587,8 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
         }
       );
     } else {
-      console.log('Bonus button clicked, but requestType is not LoyaltyAward or LoyaltyAwardRefund:', this.requestData.requestType);
-      // alert('Le bouton Bonus est uniquement disponible pour LoyaltyAward ou LoyaltyAwardRefund.');
+      console.log('Bonus button clicked, but requestType is not LoyaltyAward:', this.requestData.requestType);
+      // alert('Le bouton Bonus est uniquement disponible pour LoyaltyAward.');
     }
   }
 

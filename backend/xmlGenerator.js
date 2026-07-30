@@ -1,6 +1,6 @@
 const { generateLengthHeader } = require('./utils');
 const { pool } = require('./database');
-const { configData } = require('./tcpHandler');
+const { getConfigData } = require('./tcpHandler');
 const os = require('os'); // Importer le module os pour getLocalIPAddress
 
 // Fonction pour obtenir l'adresse IP locale de la carte réseau
@@ -258,7 +258,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
   console.log('Requête XML générée :', normalizedMessage);
 
   const buffer = Buffer.from(normalizedMessage, 'latin1');
-  if (configData.opiMode) {
+  if (getConfigData().opiMode) {
     const lengthHeader = generateLengthHeader(normalizedMessage);
     return Buffer.concat([lengthHeader, buffer]);
   }

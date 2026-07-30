@@ -88,19 +88,6 @@ export class RequestInfoService {
     return this.http.get<BasketData>(`${this.apiUrl}/basket`);
   }
 
-  saveBasketData(basketData: BasketData): Observable<BasketData> {
-    const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
-    return this.http.post<BasketData>(`${this.apiUrl}/basket`, basketData, { headers });
-  }
-
-  getSaleItems(basketDataId: number): Observable<SaleItem[]> {
-    return this.http.get<SaleItem[]>(`${this.apiUrl}/basket/${basketDataId}/sale-items`);
-  }
-
-  saveSaleItem(saleItem: SaleItem, basketDataId: number): Observable<SaleItem> {
-    const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
-    return this.http.post<SaleItem>(`${this.apiUrl}/basket/${basketDataId}/sale-items`, saleItem, { headers });
-  }
 
   getLastSaleItems(): Observable<SaleItem[]> {
     return this.http.get<SaleItem[]>(`${this.apiUrl}/last-sale-items`).pipe(
@@ -173,9 +160,6 @@ export class RequestInfoService {
     );
   }
 
-  getLastRequest(): Observable<FullRequestData> {
-    return this.http.get<FullRequestData>(`${this.apiUrl}/last-request`);
-  }
 
   getTotalAmount(requestId: string): Observable<{ totalAmount: string }> {
     return this.http.get<{ totalAmount: string }>(`${this.apiUrl}/total-amount/${requestId}`).pipe(
@@ -187,15 +171,6 @@ export class RequestInfoService {
     );
   }
 
-  getLastLoyaltyAwardStan(): Observable<{ stan: string }> {
-    return this.http.get<{ stan: string }>(`${this.apiUrl}/last-loyalty-award-stan`).pipe(
-      tap(data => console.log('STAN reçu de /last-loyalty-award-stan:', data)),
-      catchError(error => {
-        console.error('Erreur lors de la récupération du dernier STAN pour LoyaltyAward:', error);
-        return throwError(error);
-      })
-    );
-  }
 
   updateData(data: Partial<FullRequestData> & { refreshRequestId?: string }) {
     console.log('updateData appelé avec:', JSON.stringify(data, null, 2));

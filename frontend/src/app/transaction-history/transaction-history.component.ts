@@ -137,7 +137,7 @@ export class TransactionHistoryComponent implements OnInit {
           if (current.requestType === 'CardPayment' && (current.overallResult === 'Success' || current.overallResult === 'Partial')) {
             for (let j = i + 1; j < grouped.length; j++) {
               const previous = grouped[j];
-              if (previous.requestType === 'LoyaltyAward' || previous.requestType === 'LoyaltyAwardRefund') {
+              if (previous.requestType === 'LoyaltyAward') {
                 const currentAmount = parseFloat(current.basketTotal) || 0;
                 const previousAmount = parseFloat(previous.basketTotal) || 0;
                 if (Math.abs(currentAmount - previousAmount) < 0.001 && previous.overallResult === 'Success') {

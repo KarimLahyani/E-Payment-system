@@ -29,7 +29,7 @@ The simulator now maps each transaction to the schema you provided:
 
 - `request_info`: request type, site/pop ID, reference number, workstation, sender, STAN, timestamp.
 - `pos_data`: terminal state, card entry mode, batch, clerk/driver, pump/outdoor position, and POS flags.
-- `amount_data`: total/pre-authorisation amount and currency.
+- `basket_data`: total/pre-authorisation amount and currency.
 - `sale_items`: one product row using your seeded `products.product_code` values (`101`, `102`, `201`, `301`, `202`).
 - `loyalty`: used as a business-card token trace when a card profile has been inserted.
 - `response_info`: final approved/declined result, terminal ID, batch, amount, and STAN.

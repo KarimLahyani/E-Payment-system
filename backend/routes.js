@@ -1,10 +1,8 @@
 const { pool } = require('./database');
 const { insertWithErrorHandling, prepareSaleItemValues, transformSaleItem, generateDefaultSaleItems } = require('./utils');
-const { generateServiceRequest, updateConfigData: updateXmlConfigData } = require('./xmlGenerator');
-const { addMessageToSend, updateConfigData: updateTcpConfigData, restartTcpServer, getConfigData, getLastResponseXML, getLastDisplayMessage, getLastPrinterMessage, processCardServiceResponse, resolveCashierTerminalResponse, getLastCashierTerminalMessage, clearDeviceMessages } = require('./tcpHandler');
+const { generateServiceRequest } = require('./xmlGenerator');
+const { addMessageToSend, updateConfigData: updateTcpConfigData, restartTcpServer, getConfigData, getLastDisplayMessage, getLastPrinterMessage, resolveCashierTerminalResponse, getLastCashierTerminalMessage, clearDeviceMessages } = require('./tcpHandler');
 
-// Variable globale pour stocker le dernier message XML généré
-let lastServiceRequest = '';
 
 const setupRoutes = (app) => {
 
@@ -67,26 +65,6 @@ const setupRoutes = (app) => {
     }
   });
 
-  // Endpoint to fetch the stan from the most recent LoyaltyAward response
-  app.get('/last-loyalty-award-stan', async (req, res) => {
-    try {
-      const result = await pool.query(
-        `SELECT stan 
-         FROM response_info 
-         WHERE request_type = 'LoyaltyAward' 
-         AND stan IS NOT NULL 
-         ORDER BY id DESC LIMIT 1`
-      );
-      if (result.rows.length > 0) {
-        res.status(200).json({ stan: result.rows[0].stan });
-      } else {
-        res.status(404).json({ message: 'No LoyaltyAward response found with a valid stan' });
-      }
-    } catch (error) {
-      console.error('Erreur lors de la récupération du dernier STAN pour LoyaltyAward:', error);
-      res.status(500).json({ message: 'Internal server error', error: error.message });
-    }
-  });
 
   // Endpoint pour traiter les données de request-info
   app.post('/request-info', async (req, res) => {
@@ -121,7 +99,7 @@ const setupRoutes = (app) => {
           updatedRequestData.requestType || null,
           updatedRequestData.popId || null,
           updatedRequestData.refNumber || null,
-          updatedRequestData.workId || null,
+          updatedRequestData.workstationId || null,
           updatedRequestData.appSender || null,
           updatedRequestData.reprintSearchType === 'requestId' ? (updatedRequestData.originalRequestId || null) : (updatedRequestData.stan || null),
         ]
@@ -135,7 +113,6 @@ const setupRoutes = (app) => {
     // Générer le service request XML
     const serviceRequestPromise = generateServiceRequest(updatedRequestData, posData, updatedBasketData, loyaltyData);
     const serviceRequest = await serviceRequestPromise;
-    lastServiceRequest = serviceRequest;
     console.log('Generated Service Request XML:', Buffer.isBuffer(serviceRequest) ? serviceRequest.toString('latin1') : serviceRequest);
     await addMessageToSend(serviceRequest);
 
@@ -217,7 +194,7 @@ const setupRoutes = (app) => {
       }
 
       res.status(200).json({
-        message: 'Data received and saved successfully' + (refundResult.message ? ' - ' + refundResult.message : ''),
+        message: 'Data received and saved successfully',
         requestId: requestId,
         serviceRequest: Buffer.isBuffer(serviceRequest) ? serviceRequest.toString('latin1') : serviceRequest,
       });
@@ -418,7 +395,7 @@ const setupRoutes = (app) => {
           requestType: requestData.request_type || '',
           popId: requestData.pop_id || '',
           refNumber: requestData.ref_number || '',
-          workId: requestData.workstation_id || '',
+          workstationId: requestData.workstation_id || '',
           appSender: requestData.app_sender || '',
           id: requestData.id || '',
           requestId: nextRequestId, // Use nextRequestId so the form shows the upcoming ID
@@ -651,7 +628,7 @@ const setupRoutes = (app) => {
           id: 1,
           totalAmount: '0',
           preAuthAmount: '',
-          currency: basketData.currency || 'TND',
+          currency: 'TND',
           saleItems: generateDefaultSaleItems(),
           itemDetails: {},
         });

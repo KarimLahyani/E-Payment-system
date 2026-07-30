@@ -44,7 +44,7 @@ The backend requires a PostgreSQL database to store transaction and card data.
 2. Ensure you have a superuser named `postgres` with the password `976450`.
 3. Create a new, completely empty database named: `request`
 
-*(Note: If your local PostgreSQL setup uses a different username, password, or port, you must update the database connection string located in `backend/db.js` before proceeding).*
+*(Note: If your local PostgreSQL setup uses a different username, password, or port, you must update the database connection string located in `backend/database.js` before proceeding).*
 
 ### Step 4: Initialize the Database Tables
 
