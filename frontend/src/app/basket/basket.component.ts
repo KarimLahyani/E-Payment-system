@@ -315,12 +315,14 @@ export class BasketComponent implements OnInit, OnDestroy {
             }
             this.updateDisplayedItems();
           } else if (data.basketData.saleItems && data.basketData.saleItems.length === 0) {
-            // Deselect all items
+            // Deselect all items and clear discount data
             this.saleItemsList = this.saleItemsList.map(item => ({
               ...item,
               isSelected: false,
               quantity: '',
-              amount: ''
+              amount: '',
+              rebateLabel: '',
+              addProdInfo: ''
             }));
             this.basketData.saleItems = [];
             this.selectedSaleItem = null;

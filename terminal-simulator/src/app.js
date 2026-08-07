@@ -842,7 +842,7 @@
           if ((state.splitSession.basketTotal - state.splitSession.paidAmount) > 0.001) {
             shouldPrintReceipt = false;
             setScreen([decision.approved ? "APPROVED" : "DECLINED", "WAITING FOR NEXT PAYMENT..."]);
-            state.terminalMode = "waitingForCard";
+            state.terminalMode = "waitingForRequest";
             state.insertedCardId = null;
           } else {
             shouldPrintReceipt = true;
