@@ -182,15 +182,6 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
       const loyaltyLine3 = `    </Loyalty>`;
 
       loyaltySection = [loyaltyLine1, loyaltyLine2, loyaltyLine3].filter(line => line).join('\n');
-    } else if (requestType === 'CardPayment' && loyaltyData) {
-      const cardEntryMode = String(loyaltyData.cardEntryMode || 'Scanner').trim();
-      const loyaltyCard = String(loyaltyData.loyaltyCard || '').trim();
-
-      const loyaltyLine1 = `    <Loyalty CardEntryMode="${cardEntryMode}">`;
-      const loyaltyLine2 = loyaltyCard ? `        <LoyaltyCard>${loyaltyCard}</LoyaltyCard>` : '';
-      const loyaltyLine3 = `    </Loyalty>`;
-
-      loyaltySection = [loyaltyLine1, loyaltyLine2, loyaltyLine3].filter(line => line).join('\n');
     }
 
   let totalAmountSection = '';

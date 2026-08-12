@@ -244,6 +244,44 @@ const startTcpServer = () => {
 
 let client = new net.Socket();
 
+// Fonction pour traiter ServiceResponse (Login/Logoff) et insérer dans response_info
+const processServiceResponse = async (responseXML) => {
+  let requestId = '0';
+  try {
+    console.log('Starting processServiceResponse with responseXML:', responseXML);
+    const parser = new xml2js.Parser({ explicitArray: false, trim: false });
+    const result = await parser.parseStringPromise(responseXML);
+
+    const serviceResponse = result.ServiceResponse || result.EPSMessage?.ServiceResponse || result.POSMessage?.ServiceResponse;
+    if (!serviceResponse) throw new Error('ServiceResponse not found in XML');
+    console.log('Full serviceResponse object:', JSON.stringify(serviceResponse, null, 2));
+
+    const overallResult = serviceResponse['$']?.OverallResult || 'Unknown';
+    const errorCondition = serviceResponse['$']?.ErrorCondition || null;
+    const requestType = serviceResponse['$']?.RequestType || 'Unknown';
+    requestId = serviceResponse['$']?.RequestID || '0';
+
+    // Insert into response_info
+    await pool.query(
+      `INSERT INTO response_info (id, request_type, overall_result, error_condition, created_at)
+       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+       ON CONFLICT (id) DO UPDATE 
+       SET request_type = $2, overall_result = $3, error_condition = $4`,
+      [requestId, requestType, overallResult, errorCondition]
+    );
+    console.log(`Successfully inserted ServiceResponse into response_info: RequestID=${requestId}`);
+  } catch (error) {
+    console.error(`Error processing ServiceResponse: ${error.message}`);
+    await pool.query(
+      `INSERT INTO response_info (id, request_type, overall_result, created_at)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+       ON CONFLICT (id) DO UPDATE 
+       SET request_type = $2, overall_result = $3`,
+      [requestId, 'Unknown', 'Failed']
+    );
+  }
+};
+
 // Fonction pour traiter CardServiceResponse et insérer dans response_info
 const processCardServiceResponse = async (responseXML) => {
   let requestId = '0';
@@ -466,6 +504,8 @@ const sendMessage = async () => {
 
     if (response.includes('CardServiceResponse')) {
       await processCardServiceResponse(response);
+    } else if (response.includes('<ServiceResponse')) {
+      await processServiceResponse(response);
     }
   });
 
