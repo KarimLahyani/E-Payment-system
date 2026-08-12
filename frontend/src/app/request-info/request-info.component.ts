@@ -429,6 +429,10 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
 
     // Create a deep copy of basketData to avoid modifying the UI's basket
     const requestBasketData = JSON.parse(JSON.stringify(this.basketData));
+    // Filter to only include items that were actually selected
+    if (requestBasketData.saleItems && Array.isArray(requestBasketData.saleItems)) {
+      requestBasketData.saleItems = requestBasketData.saleItems.filter((item: any) => item.isSelected);
+    }
     // Keep a reference to the real total for split receipts logic
     requestBasketData.originalTotalAmount = this.basketData.totalAmount;
 

@@ -65,7 +65,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
   const splitAttr = isSplit ? ` Split="true" BasketTotal="${basketData?.originalTotalAmount || basketData?.totalAmount || '0.00'}"` : '';
 
   if (requestType === 'LoyaltyAward') {
-    const languageCode = String(posData?.languageCode || 'de').trim();
+    const languageCode = String(posData?.languageCode || 'de').trim().toLowerCase();
     const clerkLevel = String(posData?.clerkLevel || '5').trim();
     const shiftNumber = String(posData?.shiftNumber || '').trim();
     const clerkId = String(posData?.clerkId || '').trim();
@@ -73,7 +73,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
     const transactionNumber = String(posData?.transactionNumber || '').trim();
 
     const cardEntryMode = String(posData?.cardEntryMode || '').trim();
-    const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
+    const cardEntryAttr = cardEntryMode && cardEntryMode !== 'Physical Card' ? ` CardEntryMode="${cardEntryMode}"` : '';
 
     const posDataLine1 = `    <POSData LanguageCode="${languageCode}" ClerkLevel="${clerkLevel}"${cardEntryAttr}${splitAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
@@ -86,7 +86,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
     posDataSection = [posDataLine1, posDataLine2, posDataLine3, posDataLine4, posDataLine5, posDataLine6, posDataLine7].filter(line => line).join('\n');
 
   } else if (requestType === 'TicketReprint') {
-    const languageCode = String(posData?.languageCode || 'pt').trim();
+    const languageCode = String(posData?.languageCode || 'pt').trim().toLowerCase();
     const clerkLevel = String(posData?.clerkLevel || '5').trim();
     const unattended = String(posData?.unattended || 'false').trim();
     const firmwareVersion = String(posData?.firmwareVersion || '0306').trim();
@@ -95,7 +95,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
     const clerkId = String(posData?.clerkId || '555').trim();
     const posName = String(posData?.posName || '8').trim();
     const cardEntryMode = String(posData?.cardEntryMode || '').trim();
-    const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
+    const cardEntryAttr = cardEntryMode && cardEntryMode !== 'Physical Card' ? ` CardEntryMode="${cardEntryMode}"` : '';
 
     const posDataLine1 = `    <POSData LanguageCode="${languageCode}" ClerkLevel="${clerkLevel}" Unattended="${unattended}"${cardEntryAttr}${splitAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
@@ -106,9 +106,9 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
     posDataSection = [posDataLine1, posDataLine2, posDataLine3, posDataLine5].filter(line => line).join('\n');
   } else if (requestType === 'CardPayment') {
     const clerkLevel = String(posData?.clerkLevel || '5').trim();
-    const languageCode = String(posData?.languageCode || 'es').trim();
+    const languageCode = String(posData?.languageCode || 'es').trim().toLowerCase();
     const cardEntryMode = String(posData?.cardEntryMode || '').trim();
-    const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
+    const cardEntryAttr = cardEntryMode && cardEntryMode !== 'Physical Card' ? ` CardEntryMode="${cardEntryMode}"` : '';
 
     const posDataLine1 = `    <POSData ClerkLevel="${clerkLevel}" LanguageCode="${languageCode}"${cardEntryAttr}${splitAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
@@ -117,7 +117,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
     posDataSection = [posDataLine1, posDataLine2, posDataLine3].filter(line => line).join('\n');
   } else {
     const cardEntryMode = String(posData?.cardEntryMode || '').trim();
-    const cardEntryAttr = cardEntryMode ? ` CardEntryMode="${cardEntryMode}"` : '';
+    const cardEntryAttr = cardEntryMode && cardEntryMode !== 'Physical Card' ? ` CardEntryMode="${cardEntryMode}"` : '';
     const posDataLine1 = `    <POSData${cardEntryAttr}${splitAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
     const posDataLine3 = `    </POSData>`;
@@ -194,8 +194,8 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
 
   let totalAmountSection = '';
     if (requestType === 'LoyaltyAward' || requestType === 'CardPayment') {
-    const totalAmount = formatNumberWithLeadingZeros(basketData?.totalAmount || '0.00', 7, 2);
-    const currency = String(basketData?.currency || 'TND').trim();
+    const totalAmount = parseFloat(basketData?.totalAmount || '0').toFixed(2);
+    const currency = String(basketData?.currency || 'EUR').trim();
 
     totalAmountSection = `    <TotalAmount Currency="${currency}">${totalAmount}</TotalAmount>`;
   }
@@ -206,36 +206,32 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
 
     if (selectedItems.length > 0) {
       saleItemsSection = selectedItems.map((item, index) => {
-        const itemId = String(index + 1); // IFSF requires a 1-based sequential ItemID
+        const itemId = `a00${index + 1}`; // IFSF NCName constraint
         const productCode = String(item.productCode || '').trim();
-        const amount = formatNumberWithLeadingZeros(item.amount || '0.00', 7, 2);
-        const unitMeasure = String(item.unitMeasure || '').trim();
-        const unitPrice = formatNumberWithLeadingZeros(item.unitPrice || '0.00', 4, 3);
-        const quantity = formatNumberWithLeadingZeros(item.quantity || '0.00', 5, 2);
+        const amount = parseFloat(item.amount || '0').toFixed(2);
+        const unitMeasureRaw = String(item.unitMeasure || '').trim();
+        const unitMeasure = unitMeasureRaw === 'L' ? 'LTR' : unitMeasureRaw;
+        const unitPrice = parseFloat(item.unitPrice || '0').toFixed(2);
+        const quantity = parseFloat(item.quantity || '0').toFixed(2);
         const taxCode = String(item.taxCode || '').trim();
         const additionalProductCode = String(item.addProdCode || '').trim();
         const additionalProductInfo = String(item.addProdInfo || '').trim();
         const reverseSale = String(item.reverseSale || 'false').trim();
         const saleChannel = String(item.saleChannel || '').trim();
-
-        const productName = String(item.productName || '').trim();
-        const pumpId = String(item.pumpId || '').trim();
         
         const saleItemLine1 = `    <SaleItem ItemID="${itemId}"${reverseSale === 'true' ? ` ReverseSale="${reverseSale}"` : ''}>`;
         const saleItemLine2 = `        <ProductCode>${productCode}</ProductCode>`;
-        const saleItemLine3 = `        <ItemAmount>${amount}</ItemAmount>`;
+        const saleItemLine3 = `        <Amount>${amount}</Amount>`;
         const saleItemLine4 = unitMeasure ? `        <UnitMeasure>${unitMeasure}</UnitMeasure>` : '';
-        const saleItemLine5 = unitPrice ? `        <UnitPrice>${unitPrice}</UnitPrice>` : '';
-        const saleItemLine6 = quantity ? `        <Quantity>${quantity}</Quantity>` : '';
+        const saleItemLine5 = parseFloat(unitPrice) > 0 ? `        <UnitPrice>${unitPrice}</UnitPrice>` : '';
+        const saleItemLine6 = parseFloat(quantity) > 0 ? `        <Quantity>${quantity}</Quantity>` : '';
         const saleItemLine7 = taxCode ? `        <TaxCode>${taxCode}</TaxCode>` : '';
         const saleItemLine8 = additionalProductCode ? `        <AdditionalProductCode>${additionalProductCode}</AdditionalProductCode>` : '';
         const saleItemLine9 = additionalProductInfo ? `        <AdditionalProductInfo>${additionalProductInfo}</AdditionalProductInfo>` : '';
         const saleItemLine10 = saleChannel ? `        <SaleChannel>${saleChannel}</SaleChannel>` : '';
-        const saleItemLine11 = productName ? `        <ProductName>${productName}</ProductName>` : '';
-        const saleItemLine12 = pumpId ? `        <OutdoorPosition>${pumpId}</OutdoorPosition>` : '';
         const saleItemLine13 = `    </SaleItem>`;
 
-        return [saleItemLine1, saleItemLine2, saleItemLine3, saleItemLine4, saleItemLine5, saleItemLine6, saleItemLine7, saleItemLine8, saleItemLine9, saleItemLine10, saleItemLine11, saleItemLine12, saleItemLine13]
+        return [saleItemLine1, saleItemLine2, saleItemLine3, saleItemLine4, saleItemLine5, saleItemLine6, saleItemLine7, saleItemLine8, saleItemLine9, saleItemLine10, saleItemLine13]
           .filter(line => line)
           .join('\n');
       }).join('\n');
