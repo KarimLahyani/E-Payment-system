@@ -388,7 +388,7 @@ export class RequestInfoComponent implements OnInit, OnDestroy {
   }
 
   sendRequest() {
-    const implementedTypes = ['CardPayment', 'TicketReprint', 'Diagnosis'];
+    const implementedTypes = ['CardPayment', 'TicketReprint', 'Diagnosis', 'Login', 'Logoff'];
     if (!implementedTypes.includes(this.requestData.requestType)) {
       alert(this.requestData.requestType + ' is not implemented yet.');
       return;

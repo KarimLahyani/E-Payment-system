@@ -47,7 +47,7 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
   let rootTag, schemaLocation, ipAddressAttr = '';
   
   // Condition pour ServiceRequest
-  if (requestType === 'TicketReprint') {
+  if (requestType === 'TicketReprint' || requestType === 'Login' || requestType === 'Logoff') {
     rootTag = 'ServiceRequest';
     schemaLocation = 'xsi:schemaLocation="http://www.nrf-arts.org/IXRetail/namespace ./IFSF/XSD/ServiceRequest.xsd"';
     const ipAddress = getLocalIPAddress();
@@ -116,9 +116,10 @@ const generateServiceRequest = async (requestData, posData, basketData, loyaltyD
 
     posDataSection = [posDataLine1, posDataLine2, posDataLine3].filter(line => line).join('\n');
   } else {
+    const languageCode = String(posData?.languageCode || 'en').trim().toLowerCase();
     const cardEntryMode = String(posData?.cardEntryMode || '').trim();
     const cardEntryAttr = cardEntryMode && cardEntryMode !== 'Physical Card' ? ` CardEntryMode="${cardEntryMode}"` : '';
-    const posDataLine1 = `    <POSData${cardEntryAttr}${splitAttr}>`;
+    const posDataLine1 = `    <POSData LanguageCode="${languageCode}"${cardEntryAttr}${splitAttr}>`;
     const posDataLine2 = `        <POSTimeStamp>${posTimestamp}</POSTimeStamp>`;
     const posDataLine3 = `    </POSData>`;
     posDataSection = [posDataLine1, posDataLine2, posDataLine3].filter(line => line).join('\n');

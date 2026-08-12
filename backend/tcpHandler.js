@@ -229,12 +229,12 @@ const server = net.createServer((socket) => {
 });
 
 const startTcpServer = () => {
-  server.listen(configData.epsPort, configData.serverIp, () => {
-    console.log(`Server listening on ${configData.serverIp}:${configData.epsPort}`);
+  server.listen(configData.posProxyPort, configData.serverIp, () => {
+    console.log(`Server listening on ${configData.serverIp}:${configData.posProxyPort}`);
   });
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-      console.log(`Erreur : le port ${configData.epsPort} est déjà utilisé.`);
+      console.log(`Erreur : le port ${configData.posProxyPort} est déjà utilisé.`);
     }
   });
   server.on('listening', () => {
@@ -487,7 +487,7 @@ const sendMessage = async () => {
       }
     });
 
-    client.connect(configData.posProxyPort, configData.clientIp, async () => {
+    client.connect(configData.epsPort, configData.clientIp, async () => {
       const buffer = Buffer.isBuffer(message) ? message : Buffer.from(message, 'latin1');
       console.log(`Sent message with header: length=${buffer.length}, message=${messageStr}`);
       client.write(buffer);

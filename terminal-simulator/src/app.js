@@ -94,6 +94,23 @@
   socket.on('terminal:request', (xmlMessage) => {
     currentRequestXml = xmlMessage;
     
+    if (xmlMessage.includes('RequestType="Login"') || xmlMessage.includes('RequestType="Logoff"')) {
+      const isLogin = xmlMessage.includes('RequestType="Login"');
+      const reqType = isLogin ? "Login" : "Logoff";
+      const reqId = xmlMessage.match(/RequestID="([^"]+)"/)?.[1] || "123";
+      const popId = xmlMessage.match(/POPID="([^"]+)"/)?.[1] || "01";
+      const workstationId = xmlMessage.match(/WorkstationID="([^"]+)"/)?.[1] || "POS01";
+
+      const responseXml = `<?xml version="1.0" encoding="ISO-8859-1" standalone="no"?>
+<ServiceResponse ApplicationSender="TerminalSimulator" POPID="${popId}" RequestID="${reqId}" WorkstationID="${workstationId}" RequestType="${reqType}" OverallResult="Success" xmlns="http://www.nrf-arts.org/IXRetail/namespace" xmlns:IFSF="http://www.ifsf.org/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.nrf-arts.org/IXRetail/namespace ./IFSF/XSD/ServiceResponse.xsd">
+</ServiceResponse>`;
+
+      socket.emit('terminal:response', responseXml);
+      setScreen([isLogin ? 'LOGGED IN' : 'LOGGED OFF']);
+      setTimeout(() => { if (state.terminalMode === 'idle') setScreen(['WELCOME', 'Ready for transaction']); }, 2000);
+      return;
+    }
+
     if (xmlMessage.includes('RequestType="Diagnosis"')) {
       const reqId = xmlMessage.match(/RequestID="([^"]+)"/)?.[1] || "123";
       const popId = xmlMessage.match(/POPID="([^"]+)"/)?.[1] || "01";
